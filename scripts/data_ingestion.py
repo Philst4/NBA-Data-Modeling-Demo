@@ -1,6 +1,6 @@
 from nba_api.stats.endpoints import leaguegamefinder
 import pandas as pd
-
+from typing import Optional
 
 def season_to_str(season : int) -> str:
     """Converts reference of season start to reference of entire season.
@@ -14,24 +14,20 @@ def season_to_str(season : int) -> str:
     Returns:
         A string referencing the entire season, meant to be used to 
         query from the NBA API. Example use: season_to_str(2023) gives '2023-24'
-    
-    Raises:
-        TypeError: Input season is not an int
-    
     """    
-    if not isinstance(season, int):
-        raise TypeError("Season start must be of type int ")
-    
-    return str(season) + '-' + str(season + 1)[-2:]
+    return f"{season}-{str(season + 1)[-2:]}"
 
 
-def read(first_season : int=None) -> pd.DataFrame:
+
+def ingest_from_nba_api(first_season : int=None) -> Optional[pd.DataFrame]:
     """Reads in data via NBA API from season first specified to latest
 
-    This function reads in data from the NBA API's 'LeagueGameFinder' endpoint,
-    season by season (because season must be specified for access). Data for each
-    season is then stored in its pd.DataFrame format, and then eventually merged
-    into a single pd.DataFrame, which is returned to the caller.
+    This function reads in data from the NBA API's 'LeagueGameFinder' endpoint.
+    It does so by making requests for each season since season must be specified 
+    for access). Received data is then stored in its pd.DataFrame format. Once all
+    requests are made the pd.DataFrame's are merged into a single pd.DataFrame, 
+    which is returned to the caller. If no data is found, returns None. This is case
+    if specified start season is set to current year, but no season has started yet.
 
 
     Args:
@@ -49,20 +45,29 @@ def read(first_season : int=None) -> pd.DataFrame:
     
     """
 
+    current_season = pd.Timestamp.now().year # Case of having not started handled later
 
-    if first_season is None:
+    # Sets first season within reasonable range
+    if first_season is None or first_season < 1983:
+        print(" * First season with good available data is '1983-84'")
         first_season = 1983 # anecdotally first season with good data available
     
-    print(f" * Reading in regular season games from {season_to_str(first_season)} to current season")
+    elif first_season > current_season:
+        print(f" * Season {season_to_str(first_season)} hasn't happened yet; starting with {season_to_str(current_season)}")
+        first_season = current_season
+    
+    
+    # Get season strings
+    seasons = list(map(season_to_str, range(first_season, current_season+1)))
+    print(f" * Reading in regular season games from {seasons[0]} to {seasons[-1]}")
 
     # Read in all data from first season specified to current season
-    seasons = range(first_season, pd.Timestamp.now().year)
+    # Last date specifying season that hasn't 
     season_dfs = []
     for season in seasons:
-        season_str = season_to_str(season)
-        print(" * Reading in games from ", season_str, "...")
+        print(" * Reading in games from ", season, "...")
         game_finder = leaguegamefinder.LeagueGameFinder(
-            season_nullable=season_str,
+            season_nullable=season,
             season_type_nullable='Regular Season',
             league_id_nullable='00' # Specifies that the league is NBA
         )
@@ -70,17 +75,28 @@ def read(first_season : int=None) -> pd.DataFrame:
         season_df = game_finder.get_data_frames()[0]
         # Drop data read in where N/A's in WL column; means game is still in progress
         season_df = season_df.dropna(subset=['WL'])
-        season_dfs.append(season_df)
-    new_games = pd.concat(season_dfs) # gives dataframe
+        
+        # Adds dataframe to list if not empty
+        if len(season_df) > 0:
+            season_dfs.append(season_df)
+    
+    if len(season_dfs) == 0:
+        print(" * No games were found, Please choose an earlier starting year ")
+        new_games = None
+    else:
+        new_games = pd.concat(season_dfs) # gives dataframe
     return new_games
 
 
-def write(games : pd.DataFrame, write_path : str='../data/raw/raw.csv') -> None:
+def write_to_csv(games : pd.DataFrame, write_path : str='../data/raw/raw.csv') -> None:
     games.to_csv(write_path, index=False)
     print(" * Data written to: ", write_path)
     return
 
 if __name__ == "__main__":
-    games = read(first_season=1983)
-    write(games)
+    games = ingest_from_nba_api(first_season=1000)
+    if games is None:
+        print(' * No games ingested')
+    else:
+        write_to_csv(games)
     
