@@ -93,6 +93,7 @@ def write_to_csv(games : pd.DataFrame, write_path : str='../data/raw/raw.csv') -
     print(" * Data written to: ", write_path)
     return
 
+
 if __name__ == "__main__":
     games = ingest_from_nba_api(first_season=1000)
     if games is None:
