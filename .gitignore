@@ -17,3 +17,6 @@ data/
 
 # Serialized Models
 models/
+
+# Ignore web app for now
+app/

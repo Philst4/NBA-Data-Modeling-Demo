@@ -88,16 +88,11 @@ def ingest_from_nba_api(first_season : int=None) -> Optional[pd.DataFrame]:
     return new_games
 
 
-def write_to_csv(games : pd.DataFrame, write_path : str='../data/raw/raw.csv') -> None:
+def write_raw_to_csv(games : pd.DataFrame, write_dir : str, write_name : str='raw.csv') -> None:
+    write_path = '/'.join((write_dir, write_name))
     games.to_csv(write_path, index=False)
     print(" * Data written to: ", write_path)
     return
 
 
-if __name__ == "__main__":
-    games = ingest_from_nba_api(first_season=1000)
-    if games is None:
-        print(' * No games ingested')
-    else:
-        write_to_csv(games)
     

@@ -3,23 +3,21 @@ import numpy as np
 import sqlite3
 
 
-def read_from_csv(read_path='../data/raw/raw.csv') -> pd.DataFrame:
-    print(" * Reading in data from csv...")
+def read_raw_from_csv(read_dir : str, read_name : str) -> pd.DataFrame:
+    print(" * Reading in data from csv ...")
+    read_path = '/'.join((read_dir, read_name))
     return pd.read_csv(read_path)
 
-
-def drop_pcts(games : pd.DataFrame) -> None:
-    print(" * Dropping 'PCT' columns, ...")
-    pct_cols = ['FG_PCT', 'FT_PCT', 'FG3_PCT']
-    games.drop(pct_cols, axis=1, inplace=True)
+def drop_cols(games : pd.DataFrame, cols_to_drop) -> None:
+    print(f" * Dropping columns {cols_to_drop} ...")
+    games.drop(cols_to_drop, axis=1, inplace=True)
     return
-
 
 def convert_types(games : pd.DataFrame) -> None:
     # NOTE: 
     #  * Handle 'O' to in next stage; write->read converts back to 'O'
     #  * Handle datetime elsewhere; write->read converts back to 'O'
-    print(" * Converting types of existing data... ")
+    print(" * Converting types of remaining columns ... ")
     
     # Convert 'object' types to strings
     obj_cols = games.select_dtypes(include='O').columns
@@ -30,29 +28,17 @@ def convert_types(games : pd.DataFrame) -> None:
     games[num_cols] = games[num_cols].astype('float64')
     return
 
-
-def make_wl_map():
-    return lambda x : {'L' : 0, 'W' : 1}[x]    
-
-# Used for changing the 'TEAM_ID' to be more reasonable
-def make_id_map(games : pd.DataFrame, old_id_col : str):
-    unique_ids = list(games[old_id_col].unique())
-    return lambda x : dict(zip(unique_ids, range(len(unique_ids))))[x]
-
-def make_is_home_map():
-    return lambda x : int('vs.' in x)
-
-def add_cols(games : pd.DataFrame, new_cols : list[str], dependencies : list[list[str]], maps) -> None:
-    for i in range(0, len(new_cols)):
-        new_col = new_cols[i]
+def add_cols(games : pd.DataFrame, cols_to_add : list[str], dependencies : list[list[str]], maps) -> None:
+    for i in range(0, len(cols_to_add)):
+        new_col = cols_to_add[i]
         cols_depending_on = dependencies[i]
         map = maps[i]
         games[new_col] = games[cols_depending_on].map(map)
     return
 
-
 def mirror(games : pd.DataFrame, leave_out_cols : list[str]=['MATCHUP', 'GAME_ID']) -> None:
-    print(" * Mirroring data...")
+    # NOTE requires that 'games' has a 'MATCHUP' and 'GAME_ID' column
+    print(" * Mirroring data ...")
     
     # Add necessary leave_out_cols for function to operate
     if 'MATCHUP' not in leave_out_cols:
@@ -82,14 +68,7 @@ def mirror(games : pd.DataFrame, leave_out_cols : list[str]=['MATCHUP', 'GAME_ID
     games.loc[away_condn, cols_ag] = games.loc[home_condn, cols_for].values
     games.loc[home_condn, cols_ag] = games.loc[away_condn, cols_for].values
     return
-
-
-def fill_plus_minus(games : pd.DataFrame) -> None:
-    print(f" * Filling 'PLUS_MINUS'...")
-    games.loc[:, 'PLUS_MINUS'] = games.loc[:, 'PTS_for'].astype(int) - games.loc[:, 'PTS_ag'].astype(int)
-    return
-    
-    
+     
 def deal_w_NaNs(games : pd.DataFrame) -> None:
     num_NaNs = games.isna().sum(axis=0).sum()
     num_NaN_rows = games.isna().any(axis=1).sum()
@@ -101,40 +80,11 @@ def deal_w_NaNs(games : pd.DataFrame) -> None:
     print(f" * {num_NaNs} remaining NaN's in {num_NaN_rows} rows left!")
     return
     
-
-def save_as_db(games : pd.DataFrame, write_path='../data/cleaned/my_database.db') -> None:
-    print(" * Saving cleaned data as database... ")
+def save_clean_as_db(games : pd.DataFrame, write_dir : str, write_name : str) -> None:
+    print(" * Saving cleaned data as database ... ")
+    write_path = '/'.join((write_dir, write_name))
     conn = sqlite3.connect(write_path)
     games.to_sql('my_table', conn, if_exists='replace', index=False)
     conn.close()    
-    print(" * Data saved")
+    print(" * Data saved!")
     return 
-
-
-if __name__ == "__main__":
-    print(" --- RUNNING DATA CLEANING SCRIPT --- ")
-    
-    # Read in games
-    games = read_from_csv()
-    
-    # Initial cleaning
-    drop_pcts(games)
-    convert_types(games)
-    
-    # Define new columns to add
-    new_cols = ['TARGET', 'NEW_TEAM_ID', 'IS_HOME']
-    dependencies = [['WL'], ['TEAM_ID'], ['MATCHUP']]
-    maps = [make_wl_map(), make_id_map(games, 'TEAM_ID'), make_is_home_map()]
-    add_cols(games, new_cols, dependencies, maps)
-    
-    # Mirror opposing stats
-    leave_out_cols = ['SEASON_ID', 'GAME_DATE', 'GAME_ID', 'MATCHUP', 'PLUS_MINUS', 'WL', 'TARGET']
-    mirror(games, leave_out_cols)
-    
-    # Deal with NaN's
-    fill_plus_minus(games)
-    deal_w_NaNs(games)
-    
-    # Save the cleaned data
-    save_as_db(games)
-    print('Success')
