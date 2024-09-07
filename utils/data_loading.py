@@ -2,90 +2,156 @@ import sqlite3
 import numpy as np
 import torch
 from torch.utils.data import (
-    Dataset, 
-    DataLoader
+    Dataset,
 )
-from torch.nn.utils.rnn import pad_sequence
+import random
 
 
 #### FUNCTIONALITY FOR FEEDING DATA TO MODEL
 
-# Finds all data in sequence
-# This class only supports numerical data. At the moment
-class SequenceDataset(Dataset):
+class SeasonSequenceDataset(Dataset):
     def __init__(
-            self, 
-            db_path, 
-            table_name, 
-            season_col, 
-            date_col, 
-            start_season, 
-            end_season, 
-            cols_to_select,
-            transform=None
-        ):
+        self, 
+        db_path,
+        table_name,
+        season_col='SEASON_ID',
+        date_col='GAME_DATE',
+        data_cols='*',
+        meta_cols=['SEASON_ID', 'GAME_DATE', 'MATCHUP'],
+        start_season=21983,
+        end_season=22023,
+        transform = None,
+    ):
+    
         self.conn = sqlite3.connect(db_path)
         self.cursor = self.conn.cursor()
         self.table_name = table_name
         self.season_col = season_col
         self.date_col = date_col
-        self.start_season = start_season
-        self.end_season = end_season
-        self.dates = self._get_unique_dates(table_name, season_col, start_season, end_season)
-        self.partitioned_cols = cols_to_select
-        self.main_query = self._get_main_query(table_name, season_col, date_col, cols_to_select)
-        self.transform = transform # NOTE: should not include ToTensor.
-
-    def _get_unique_dates(self, table_name, season_col, start_season, end_season):
-        # Query to get all unique dates in the database
-        query = f"SELECT DISTINCT {season_col} FROM {table_name} WHERE {season_col} BETWEEN {start_season} AND {end_season} AND IS_HOME_for = 1"
+        self.data_cols = data_cols
+        self.meta_cols = meta_cols
+        self.ordering = f"""
+        ORDER BY {date_col}
+        """
+        
+        self.seasons = self._set_unique_seasons(
+            table_name,
+            season_col,
+            start_season, 
+            end_season
+        )
+    
+    def _set_unique_seasons(self, table_name, season_col, start_season, end_season):
+        table_name = self.table_name
+        season_col = self.season_col
+        query = f"""
+        SELECT DISTINCT {season_col} 
+        FROM {table_name} 
+        WHERE {season_col} BETWEEN {start_season} AND {end_season} 
+        ORDER BY {season_col} ASC
+        """
         self.cursor.execute(query)
         return [row[0] for row in self.cursor.fetchall()]
+        
+    def _get_main_query(self, season, include_meta=False):
+        table_name = self.table_name
+        season_col = self.season_col
+        if include_meta:
+            cols = self.meta_cols + self.data_cols
+        else:
+            cols = self.data_cols
+        col_str = ', '.join(cols)
+        return f"""
+        SELECT {col_str}
+        FROM {table_name}
+        WHERE {season_col} = {season} 
+        AND IS_HOME_for = {1}"""
     
-    def _get_main_query(self, table_name, season_col, date_col, cols_to_select):
-        flatten = lambda nested_list : [item for sublist in nested_list for item in sublist]
-        cols = ', '.join(flatten(cols_to_select))
-        return f"SELECT {cols} FROM {table_name} WHERE {season_col} = ? ORDER BY {date_col}"
+    def get_full_season_sequence(
+        self, 
+        season, 
+        include_meta=False
+    ):
+        main_query = self._get_main_query(season, include_meta)
+        query = ''.join((main_query, self.ordering, ';'))
+        self.cursor.execute(query)
+        return self.cursor.fetchall()
+    
+    def _get_season(self, date):
+        # Finds season associated with date
+        # If no games played on date, gives 
+        # season of most recent game preceding date
+        query = f"""
+        SELECT {self.season_col}
+        FROM my_table
+        WHERE {self.date_col} <= '{date}'
+        ORDER BY {self.date_col} DESC
+        LIMIT 1;
+        """
+        self.cursor.execute(query)
+        res = self.cursor.fetchall()
+        if not res:
+            return 21983
+        return res[0][0]
+    
+    def get_partial_season_sequence(
+        self, 
+        date, 
+        include_meta=False
+    ):
+        # Gets season sequence preceding date
+        season = self._get_season(date)
+        main_query = self._get_main_query(season, include_meta)
+        date_condn = f"""
+        AND {self.date_col} < '{date}'
+        """
+        query = ''.join((main_query, date_condn, self.ordering, ';'))
+        self.cursor.execute(query)
+        return self.cursor.fetchall(), season
+    
+    def get_team_id(self, team_abbr, season):
+        query = f"""
+        SELECT NEW_TEAM_ID
+        FROM team_metadata
+        WHERE SEASON_ID = {season}
+        AND TEAM_ABBREVIATION = '{team_abbr}'
+        LIMIT 1;
+        """
+        self.cursor.execute(query)
+        res = self.cursor.fetchall()
+        if not res:
+            return None
+        return res[0][0]
 
-    def _get_season_sequence(self, season):
-        # Query to get all rows for the given date, optionally ordered
-        self.cursor.execute(self.main_query, (season,))
-        return self.cursor.fetchall() # returns a list of tuples
+    def get_team_abbr(self, season, team_id=None):
+        if not team_id:
+            team_id = random.randint(0, 29)
+        query = f"""
+        SELECT TEAM_ABBREVIATION
+        FROM team_metadata
+        WHERE SEASON_ID = {season}
+        AND NEW_TEAM_ID = {team_id}
+        LIMIT 1;
+        """
+        self.cursor.execute(query)
+        res = self.cursor.fetchall()
+        if not res:
+            return None
+        return res[0][0]
 
-    # Modify to support strings
-    def _get_partitioned_selection(self, selection):
-        selection = torch.tensor(selection)
-        partitioned_columns = self.partitioned_cols
-        partitioned_selection = []
-        i = 0
-        for partition in partitioned_columns:
-            partition_len = len(partition)
-            partitioned_selection.append(selection[:, i:i+partition_len])
-            i += partition_len
-        return tuple(partitioned_selection)
 
     def __len__(self):
-        return len(self.dates)
+        return len(self.seasons)
 
     def __getitem__(self, idx):
         # Get the date for the current index
-        date = self.dates[idx]
+        season = self.seasons[idx]
         # Get the sequence of rows corresponding to that date
-        sequence = self._get_season_sequence(date)
-        partitioned_selection = self._get_partitioned_selection(sequence)
+        season_sequence = self.get_full_season_sequence(season)
+        return season_sequence
+    
+    
 
-        if self.transform is not None:
-            partitioned_selection = tuple(map(self.transform, partitioned_selection))
-
-        return partitioned_selection
-
-
-# Pads sequences of given batch to match
-def collate_fn(batch):
-    partitions = zip(*batch)
-    padder = lambda b : pad_sequence(b, batch_first=True, padding_value=0)
-    padded_batch = tuple(map(padder, partitions))
-    return padded_batch
 
 
 # Turns given sequence of features into one-hot encoded sequence of features

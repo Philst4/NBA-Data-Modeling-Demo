@@ -36,6 +36,27 @@ def add_cols(games : pd.DataFrame, cols_to_add : list[str], dependencies : list[
         games[new_col] = games[cols_depending_on].map(map)
     return
 
+def make_team_id_df(
+    games : pd.DataFrame, 
+    season_id_col='SEASON_ID',
+    team_id_col='NEW_TEAM_ID', 
+    abbr_col='TEAM_ABBREVIATION',
+    debug=False
+):
+    print(" * Making table containing team metadata ...")
+    
+    team_id_df = games.groupby([season_id_col, team_id_col])[abbr_col].unique().reset_index()
+    team_id_df = team_id_df.explode(abbr_col).reset_index(drop=True)
+    
+    if debug:
+        print(games.columns)
+        input()
+        print(team_id_df.columns)
+        input()
+        print(team_id_df.head())
+        input()
+    return team_id_df
+
 def mirror(games : pd.DataFrame, leave_out_cols : list[str]=['MATCHUP', 'GAME_ID']) -> None:
     # NOTE requires that 'games' has a 'MATCHUP' and 'GAME_ID' column
     print(" * Mirroring data ...")
@@ -68,7 +89,30 @@ def mirror(games : pd.DataFrame, leave_out_cols : list[str]=['MATCHUP', 'GAME_ID
     games.loc[away_condn, cols_ag] = games.loc[home_condn, cols_for].values
     games.loc[home_condn, cols_ag] = games.loc[away_condn, cols_for].values
     return
-     
+
+def get_summary_stats(games : pd.DataFrame, leave_out_cols, debug=False) -> None:
+    print(" * Making table containing season means, stds by stat ... ")
+    
+    # If stat has '_for' and '_ag', only using '_for' for calculations
+    cols_to_summarize = [col for col in list(games.columns) if '_ag' not in col]
+    cols_to_summarize = [col for col in cols_to_summarize if not any(col2 in col for col2 in leave_out_cols)]
+    if 'SEASON_ID' not in cols_to_summarize:
+        cols_to_summarize.append('SEASON_ID')
+    if debug:
+        print(cols_to_summarize)
+        input()
+    
+    # Get summary stats
+    summary_stats = games[cols_to_summarize].groupby('SEASON_ID').agg(['mean', 'std'])
+    summary_stats.columns = ['_'.join(col) for col in summary_stats.columns]
+    # Remove '_for' from relevant column names
+    summary_stats.columns = [col.replace('_for', '') for col in summary_stats.columns]
+    if debug:
+        print(summary_stats.columns)
+        input()
+    
+    return summary_stats
+
 def deal_w_NaNs(games : pd.DataFrame) -> None:
     num_NaNs = games.isna().sum(axis=0).sum()
     num_NaN_rows = games.isna().any(axis=1).sum()
@@ -80,11 +124,16 @@ def deal_w_NaNs(games : pd.DataFrame) -> None:
     print(f" * {num_NaNs} remaining NaN's in {num_NaN_rows} rows left!")
     return
     
-def save_clean_as_db(games : pd.DataFrame, write_dir : str, write_name : str) -> None:
-    print(" * Saving cleaned data as database ... ")
-    write_path = '/'.join((write_dir, write_name))
+def save_as_db(
+    df : pd.DataFrame, 
+    write_dir : str, 
+    db_name : str, 
+    table_name : str,
+    index=False
+) -> None:
+    write_path = '/'.join((write_dir, db_name))
     conn = sqlite3.connect(write_path)
-    games.to_sql('my_table', conn, if_exists='replace', index=False)
+    df.to_sql(table_name, conn, if_exists='replace', index=index)
     conn.close()    
-    print(" * Data saved!")
+    print(f" * Data saved to '{write_path}' as '{table_name}'")
     return 
