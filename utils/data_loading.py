@@ -4,6 +4,7 @@ import torch
 from torch.utils.data import (
     Dataset,
 )
+from torch.nn.utils.rnn import pad_sequence
 import random
 
 
@@ -14,6 +15,7 @@ class SeasonSequenceDataset(Dataset):
         self, 
         db_path,
         table_name,
+        ssd_config,
         season_col='SEASON_ID',
         date_col='GAME_DATE',
         data_cols='*',
@@ -25,11 +27,13 @@ class SeasonSequenceDataset(Dataset):
     
         self.conn = sqlite3.connect(db_path)
         self.cursor = self.conn.cursor()
-        self.table_name = table_name
         self.season_col = season_col
         self.date_col = date_col
-        self.data_cols = data_cols
+        self.table_name = table_name
+        self.partitioned_data_cols = data_cols
+        self.flattened_data_cols = self._flatten_partition(data_cols)
         self.meta_cols = meta_cols
+        self.meta_len = len(meta_cols)
         self.ordering = f"""
         ORDER BY {date_col}
         """
@@ -40,6 +44,11 @@ class SeasonSequenceDataset(Dataset):
             start_season, 
             end_season
         )
+    
+    def _flatten_partition(self, partitioned_cols):
+        # Flattens the list
+        data_cols = [col for partition in partitioned_cols for col in partition]
+        return data_cols
     
     def _set_unique_seasons(self, table_name, season_col, start_season, end_season):
         table_name = self.table_name
@@ -57,9 +66,9 @@ class SeasonSequenceDataset(Dataset):
         table_name = self.table_name
         season_col = self.season_col
         if include_meta:
-            cols = self.meta_cols + self.data_cols
+            cols = self.meta_cols + self.flattened_data_cols
         else:
-            cols = self.data_cols
+            cols = self.flattened_data_cols
         col_str = ', '.join(cols)
         return f"""
         SELECT {col_str}
@@ -67,15 +76,74 @@ class SeasonSequenceDataset(Dataset):
         WHERE {season_col} = {season} 
         AND IS_HOME_for = {1}"""
     
+    def _separate_metadata(self, selection, include_meta):
+        # Separate metadata
+        if include_meta:
+            metadata_len = self.meta_len
+        else:
+            metadata_len = 0
+        metadata, data = [], []
+        for row in selection:
+            metadata.append(row[:metadata_len])
+            data.append(row[metadata_len:])
+        return metadata, torch.tensor(data)
+    
+    def _partition_data(self, data):
+        partitioned_data_cols = self.partitioned_data_cols
+        partitioned_data = []
+        start = 0
+        for p in partitioned_data_cols:
+            end = start + len(p)
+            partitioned_data.append(data[:, start : end])
+            start = end
+        return partitioned_data
+    
+    def _get_means_stds(self, season):
+        data_cols = self.flattened_data_cols
+        data_cols = [col.replace('_for', '') for col in data_cols]        
+        data_cols = [col.replace('_ag', '') for col in data_cols]
+        data_cols = list(set(data_cols)) # drop duplicates
+        select_cols = [col + '_mean' for col in data_cols]
+        select_cols += [col + '_std' for col in data_cols]
+        print(data_cols)
+        
+        select_cols = ['PLUS_MINUS_mean', 'PLUS_MINUS_std']
+        select_cols_str = ', '.join(select_cols)
+        
+        query = f"""
+        SELECT {select_cols_str}
+        FROM summary_stats
+        WHERE SEASON_ID = ?
+        LIMIT 1;
+        """
+        self.cursor.execute(query, (season,))
+        res = self.cursor.fetchall()
+        print(res)
+        return
+    
+    def _process_data(self, partitioned_data):
+        return partitioned_data
+    
     def get_full_season_sequence(
         self, 
         season, 
-        include_meta=False
+        include_meta=False,
+        normalize=False
     ):
         main_query = self._get_main_query(season, include_meta)
         query = ''.join((main_query, self.ordering, ';'))
         self.cursor.execute(query)
-        return self.cursor.fetchall()
+        selection  = self.cursor.fetchall()
+        
+        # Separate metadata
+        metadata, data = self._separate_metadata(selection, include_meta)
+        
+        # Partition data
+        data = self._partition_data(data)
+        
+        # Return tuple
+        return metadata, data
+
     
     def _get_season(self, date):
         # Finds season associated with date
@@ -143,12 +211,30 @@ class SeasonSequenceDataset(Dataset):
     def __len__(self):
         return len(self.seasons)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx, normalize=True):
         # Get the date for the current index
         season = self.seasons[idx]
         # Get the sequence of rows corresponding to that date
         season_sequence = self.get_full_season_sequence(season)
         return season_sequence
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     
     
 
@@ -175,3 +261,27 @@ def make_ohe(sequence : torch.Tensor, ohe_size=32, stack=True) -> torch.Tensor:
     if stack:
         return torch.cat(ohe_sequence, dim=-1)
     return ohe_sequence
+
+#### COLLATOR
+def make_padding_masks(batch):
+    make_padding_mask = lambda sequence : torch.ones(sequence.shape[0])
+    padding_masks = list(map(make_padding_mask, batch))
+    padding_masks = pad_sequence(padding_masks, batch_first=True, padding_value=0)
+    return padding_masks.unsqueeze(dim=-1)
+
+
+def make_collate_fn(partition):
+    pass
+
+
+def collate_fn(batch, shuffle=False):    
+    batch = list(map(torch.tensor, batch))
+    padding_masks = make_padding_masks(batch)
+    batch = pad_sequence(batch, batch_first=True, padding_value=0)
+    
+    kqs = make_ohe(batch[:, :, 0:2], shuffle)
+    vs = batch[:, :, 2:3]
+    targets = batch[:, :, 3:4]
+    batch = (kqs, vs, targets, padding_masks)
+    return batch    
+
