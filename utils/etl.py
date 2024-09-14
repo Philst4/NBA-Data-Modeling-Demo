@@ -3,15 +3,15 @@ import numpy as np
 import sqlite3
 
 
-def read_raw_from_csv(read_dir : str, read_name : str) -> pd.DataFrame:
+def read_from_csv(read_path : str) -> pd.DataFrame:
     print(" * Reading in data from csv ...")
-    read_path = '/'.join((read_dir, read_name))
     return pd.read_csv(read_path)
 
-def drop_cols(games : pd.DataFrame, cols_to_drop) -> None:
-    print(f" * Dropping columns {cols_to_drop} ...")
+
+def drop_cols(games : pd.DataFrame, cols_to_drop, verbose=False) -> None:
+    if verbose:
+        print(f" * Dropping columns {cols_to_drop} ...")
     games.drop(cols_to_drop, axis=1, inplace=True)
-    return
 
 def convert_types(games : pd.DataFrame) -> None:
     # NOTE: 
@@ -26,7 +26,12 @@ def convert_types(games : pd.DataFrame) -> None:
     # Convert 'number' types to float
     num_cols = games.select_dtypes(include='number').columns
     games[num_cols] = games[num_cols].astype('float64')
-    return
+
+# Used for changing the 'TEAM_ID' to be more reasonable
+def make_id_map(games : pd.DataFrame, old_id_col : str):
+    unique_ids = sorted(list(games[old_id_col].unique()))
+    return lambda x : dict(zip(unique_ids, range(len(unique_ids))))[x]
+
 
 def add_cols(games : pd.DataFrame, cols_to_add : list[str], dependencies : list[list[str]], maps) -> None:
     for i in range(0, len(cols_to_add)):
@@ -34,41 +39,21 @@ def add_cols(games : pd.DataFrame, cols_to_add : list[str], dependencies : list[
         cols_depending_on = dependencies[i]
         map = maps[i]
         games[new_col] = games[cols_depending_on].map(map)
-    return
 
-def make_team_id_df(
+
+def mirror(
     games : pd.DataFrame, 
-    season_id_col='SEASON_ID',
-    team_id_col='NEW_TEAM_ID', 
-    abbr_col='TEAM_ABBREVIATION',
-    debug=False
-):
-    print(" * Making table containing team metadata ...")
-    
-    team_id_df = games.groupby([season_id_col, team_id_col])[abbr_col].unique().reset_index()
-    team_id_df = team_id_df.explode(abbr_col).reset_index(drop=True)
-    
-    if debug:
-        print(games.columns)
-        input()
-        print(team_id_df.columns)
-        input()
-        print(team_id_df.head())
-        input()
-    return team_id_df
-
-def mirror(games : pd.DataFrame, leave_out_cols : list[str]=['MATCHUP', 'GAME_ID']) -> None:
-    # NOTE requires that 'games' has a 'MATCHUP' and 'GAME_ID' column
+    cols_not_to_mirror=[]
+) -> None:
     print(" * Mirroring data ...")
     
-    # Add necessary leave_out_cols for function to operate
-    if 'MATCHUP' not in leave_out_cols:
-        leave_out_cols.append('MATCHUP')
-    elif 'GAME_ID' not in leave_out_cols:
-        leave_out_cols.append('GAME_ID')
+    # First, save away_condn, home_condn
+    games.sort_values(by='GAME_ID', inplace=True)
+    away_condn = games['IS_HOME'] == 0
+    home_condn = games['IS_HOME'] == 1
     
     # Identify columns to be mirrored; initialize new column names
-    cols_to_mirror = [col for col in list(games.columns) if col not in leave_out_cols]
+    cols_to_mirror = [col for col in list(games.columns) if col not in cols_not_to_mirror]
     col_for_mapping = {col: col + '_for' for col in cols_to_mirror}
 
     # Rename columns existing columns to cols_for
@@ -81,21 +66,15 @@ def mirror(games : pd.DataFrame, leave_out_cols : list[str]=['MATCHUP', 'GAME_ID
     # Fill in new columns with data from opposing team's game instance
     # Identify matching game instances using home-away conditions
     cols_for = list(col_for_mapping.values())
-    away_condn = games['MATCHUP'].apply(lambda x : '@' in x)
-    home_condn = games['MATCHUP'].apply(lambda x : 'vs.' in x)
-    
-    # Sort, then match
-    games.sort_values(by='GAME_ID', inplace=True)
     games.loc[away_condn, cols_ag] = games.loc[home_condn, cols_for].values
     games.loc[home_condn, cols_ag] = games.loc[away_condn, cols_for].values
-    return
+
 
 def get_summary_stats(games : pd.DataFrame, leave_out_cols, debug=False) -> None:
-    print(" * Making table containing season means, stds by stat ... ")
+    print(" * Making summary table with season means, stds of each stat ... ")
     
     # If stat has '_for' and '_ag', only using '_for' for calculations
-    cols_to_summarize = [col for col in list(games.columns) if '_ag' not in col]
-    cols_to_summarize = [col for col in cols_to_summarize if not any(col2 in col for col2 in leave_out_cols)]
+    cols_to_summarize = [col for col in list(games.columns) if col not in leave_out_cols]
     if 'SEASON_ID' not in cols_to_summarize:
         cols_to_summarize.append('SEASON_ID')
     if debug:
@@ -110,8 +89,8 @@ def get_summary_stats(games : pd.DataFrame, leave_out_cols, debug=False) -> None
     if debug:
         print(summary_stats.columns)
         input()
-    
     return summary_stats
+
 
 def deal_w_NaNs(games : pd.DataFrame) -> None:
     num_NaNs = games.isna().sum(axis=0).sum()
@@ -122,9 +101,9 @@ def deal_w_NaNs(games : pd.DataFrame) -> None:
     num_NaNs = games.isna().sum(axis=0).sum()
     num_NaN_rows = games.isna().any(axis=1).sum()
     print(f" * {num_NaNs} remaining NaN's in {num_NaN_rows} rows left!")
-    return
+  
     
-def save_as_db(
+def save_to_db(
     df : pd.DataFrame, 
     write_dir : str, 
     db_name : str, 
@@ -135,5 +114,4 @@ def save_as_db(
     conn = sqlite3.connect(write_path)
     df.to_sql(table_name, conn, if_exists='replace', index=index)
     conn.close()    
-    print(f" * Data saved to '{write_path}' as '{table_name}'")
-    return 
+    print(f" * Table saved to '{write_path}' as '{table_name}' (run 'python scripts/check_db.py' for more info)")
