@@ -5,7 +5,6 @@ from torch.utils.data import (
     Dataset,
 )
 from torch.nn.utils.rnn import pad_sequence
-import random
 
 
 #### FUNCTIONALITY FOR FEEDING DATA TO MODEL
@@ -14,172 +13,198 @@ class SeasonSequenceDataset(Dataset):
     def __init__(
         self, 
         db_path,
-        table_name,
-        ssd_config,
-        season_col='SEASON_ID',
-        date_col='GAME_DATE',
-        data_cols='*',
-        meta_cols=['SEASON_ID', 'GAME_DATE', 'MATCHUP'],
+        tables,
         start_season=21983,
         end_season=22023,
-        transform = None,
     ):
     
         self.conn = sqlite3.connect(db_path)
         self.cursor = self.conn.cursor()
-        self.season_col = season_col
-        self.date_col = date_col
-        self.table_name = table_name
-        self.partitioned_data_cols = data_cols
-        self.flattened_data_cols = self._flatten_partition(data_cols)
-        self.meta_cols = meta_cols
-        self.meta_len = len(meta_cols)
-        self.ordering = f"""
-        ORDER BY {date_col}
-        """
         
-        self.seasons = self._set_unique_seasons(
-            table_name,
-            season_col,
+        # List of table info
+        self.table_names = self.extract_table_names(tables)
+        self.cols_at_table = self.make_cols_at_table_map(tables)
+        self.flattened_columns = self.extract_columns_flattened(tables)
+        self.cols_at_transform = self.make_cols_at_transform_map(tables)
+        self.cols_at_group = self.make_cols_at_group_map(tables)
+        self.seasons = [row[0] for row in self._query_unique_seasons(
             start_season, 
             end_season
-        )
+        )]
     
-    def _flatten_partition(self, partitioned_cols):
-        # Flattens the list
-        data_cols = [col for partition in partitioned_cols for col in partition]
-        return data_cols
+    #### INITIALIZATION METHODS
+    def extract_table_names(self, tables):
+        return [table['name'] for table in tables]
     
-    def _set_unique_seasons(self, table_name, season_col, start_season, end_season):
-        table_name = self.table_name
-        season_col = self.season_col
+    def make_cols_at_table_map(self, tables):
+        res = {}
+        for table in tables:
+            table_name = table['name']
+            res[table_name] = []
+            for col in table['columns']:
+                res[table_name].append(col[0])
+        return res
+    
+    def extract_columns_flattened(self, tables):
+        columns = []
+        for table in tables:
+            table_name = table['name']
+            for col in table['columns']:
+                col_name = col[0]
+                columns.append('.'.join((table_name, col_name)))
+        return columns
+    
+    def make_cols_at_transform_map(self, tables):
+        cols_at_transform = {}
+        for table in tables:
+            table_name = table['name']
+            for col, transform, _ in table['columns']:
+                if transform not in cols_at_transform:
+                    cols_at_transform[transform] = []
+                col = '.'.join((table_name, col))
+                cols_at_transform[transform].append(col)
+        return cols_at_transform
+    
+    def make_cols_at_group_map(self, tables):
+        cols_at_grouping = {}
+        for table in tables:
+            table_name = table['name']
+            for col, _, grouping in table['columns']:
+                if grouping not in cols_at_grouping:
+                    cols_at_grouping[grouping] = []
+                col = '.'.join((table_name, col))
+                cols_at_grouping[grouping].append(col)
+        return cols_at_grouping
+    
+    #### QUERIES
+    def _query_unique_seasons(self, start_season : int, end_season : int):
         query = f"""
-        SELECT DISTINCT {season_col} 
-        FROM {table_name} 
-        WHERE {season_col} BETWEEN {start_season} AND {end_season} 
-        ORDER BY {season_col} ASC
+        SELECT DISTINCT SEASON_ID
+        FROM team_metadata
+        WHERE SEASON_ID BETWEEN {start_season} AND {end_season} 
+        ORDER BY SEASON_ID ASC;
         """
         self.cursor.execute(query)
-        return [row[0] for row in self.cursor.fetchall()]
-        
-    def _get_main_query(self, season, include_meta=False):
-        table_name = self.table_name
-        season_col = self.season_col
-        if include_meta:
-            cols = self.meta_cols + self.flattened_data_cols
-        else:
-            cols = self.flattened_data_cols
-        col_str = ', '.join(cols)
-        return f"""
-        SELECT {col_str}
-        FROM {table_name}
-        WHERE {season_col} = {season} 
-        AND IS_HOME_for = {1}"""
+        return self.cursor.fetchall()
     
-    def _separate_metadata(self, selection, include_meta):
-        # Separate metadata
-        if include_meta:
-            metadata_len = self.meta_len
-        else:
-            metadata_len = 0
-        metadata, data = [], []
-        for row in selection:
-            metadata.append(row[:metadata_len])
-            data.append(row[metadata_len:])
-        return metadata, torch.tensor(data)
-    
-    def _partition_data(self, data):
-        partitioned_data_cols = self.partitioned_data_cols
-        partitioned_data = []
-        start = 0
-        for p in partitioned_data_cols:
-            end = start + len(p)
-            partitioned_data.append(data[:, start : end])
-            start = end
-        return partitioned_data
-    
-    def _get_means_stds(self, season):
-        data_cols = self.flattened_data_cols
-        data_cols = [col.replace('_for', '') for col in data_cols]        
-        data_cols = [col.replace('_ag', '') for col in data_cols]
-        data_cols = list(set(data_cols)) # drop duplicates
-        select_cols = [col + '_mean' for col in data_cols]
-        select_cols += [col + '_std' for col in data_cols]
-        print(data_cols)
-        
-        select_cols = ['PLUS_MINUS_mean', 'PLUS_MINUS_std']
-        select_cols_str = ', '.join(select_cols)
-        
-        query = f"""
-        SELECT {select_cols_str}
-        FROM summary_stats
-        WHERE SEASON_ID = ?
-        LIMIT 1;
+    def _query_full_season_data(self, season, include_cols=True):
+        create_temp_cmd = f"""
+        CREATE TABLE temp AS 
+        SELECT UNIQUE_ID, GAME_DATE
+        FROM game_metadata
+        WHERE SEASON_ID = {season}
+        AND IS_HOME = 1
+        ORDER BY GAME_DATE ASC;
         """
-        self.cursor.execute(query, (season,))
-        res = self.cursor.fetchall()
-        print(res)
-        return
+        drop_temp_cmd = f"""
+        DROP TABLE IF EXISTS temp;
+        """
+        self.cursor.execute(drop_temp_cmd)
+        self.cursor.execute(create_temp_cmd)
+        self.cursor.execute("SELECT * FROM temp;")
+        unique_ids = [row[0] for row in self.cursor.fetchall()]
+        cols_at_unique_id = {id : [] for id in unique_ids}
+        for table_name in self.table_names:
+            cols = self.cols_at_table[table_name]
+            cols_to_select = ['.'.join((table_name, col)) for col in cols]
+            cols_to_select_str =', '.join(cols_to_select)
+            # Right join unsupported
+            query = f"""
+            SELECT temp.UNIQUE_ID, {cols_to_select_str}
+            FROM {table_name}
+            INNER JOIN temp
+            ON temp.UNIQUE_ID = {table_name}.UNIQUE_ID
+            ORDER BY temp.GAME_DATE ASC;
+            """
+            self.cursor.execute(query)
+            selection = self.cursor.fetchall()
+            for row in selection:
+                id, data = row[0], row[1:]
+                cols_at_unique_id[id] += data
+        self.cursor.execute(drop_temp_cmd)
+        # Keep rows with all fields
+        selections = [
+            tuple(cols_at_unique_id[id]) for id in unique_ids if len(cols_at_unique_id[id]) == len(self.flattened_columns)
+        ]
+        return selections
     
-    def _process_data(self, partitioned_data):
-        return partitioned_data
-    
-    def get_full_season_sequence(
-        self, 
-        season, 
-        include_meta=False,
-        normalize=False
-    ):
-        main_query = self._get_main_query(season, include_meta)
-        query = ''.join((main_query, self.ordering, ';'))
-        self.cursor.execute(query)
-        selection  = self.cursor.fetchall()
-        
-        # Separate metadata
-        metadata, data = self._separate_metadata(selection, include_meta)
-        
-        # Partition data
-        data = self._partition_data(data)
-        
-        # Return tuple
-        return metadata, data
-
-    
-    def _get_season(self, date):
-        # Finds season associated with date
-        # If no games played on date, gives 
-        # season of most recent game preceding date
+    def _query_season_by_date(self, cutoff_date : str):
+        # Extrapolates last-played season wrt given date
         query = f"""
-        SELECT {self.season_col}
-        FROM my_table
-        WHERE {self.date_col} <= '{date}'
-        ORDER BY {self.date_col} DESC
+        SELECT SEASON_ID
+        FROM game_metadata
+        WHERE GAME_DATE < '{cutoff_date}'
+        ORDER BY GAME_DATE DESC
         LIMIT 1;
         """
         self.cursor.execute(query)
-        res = self.cursor.fetchall()
-        if not res:
-            return 21983
-        return res[0][0]
+        selection = self.cursor.fetchall()
+        return selection
     
-    def get_partial_season_sequence(
-        self, 
-        date, 
-        include_meta=False
-    ):
-        # Gets season sequence preceding date
-        season = self._get_season(date)
-        main_query = self._get_main_query(season, include_meta)
-        date_condn = f"""
-        AND {self.date_col} < '{date}'
+    def _query_partial_season_data(self, cutoff_date : str):
+        latest_season_selection = self._query_season_by_date(cutoff_date)
+        if not latest_season_selection:
+            latest_season = 21983
+        else:
+            latest_season = latest_season_selection[0][0]
+        create_temp_cmd = f"""        
+        CREATE TABLE temp AS 
+        SELECT UNIQUE_ID, GAME_DATE
+        FROM game_metadata
+        WHERE SEASON_ID = {latest_season}
+        AND IS_HOME = 1
+        AND GAME_DATE < '{cutoff_date}'
+        ORDER BY GAME_DATE ASC;
         """
-        query = ''.join((main_query, date_condn, self.ordering, ';'))
-        self.cursor.execute(query)
-        return self.cursor.fetchall(), season
+        drop_temp_cmd = f"""
+        DROP TABLE IF EXISTS temp;
+        """
+        self.cursor.execute(drop_temp_cmd)
+        self.cursor.execute(create_temp_cmd)
+        self.cursor.execute("SELECT * FROM temp;")
+        unique_ids = [row[0] for row in self.cursor.fetchall()]
+        cols_at_unique_id = {id : [] for id in unique_ids}
+        for table_name in self.table_names:
+            cols = self.cols_at_table[table_name]
+            cols_to_select = ['.'.join((table_name, col)) for col in cols]
+            cols_to_select_str =', '.join(cols_to_select)
+            # Right join unsupported
+            query = f"""
+            SELECT temp.UNIQUE_ID, {cols_to_select_str}
+            FROM {table_name}
+            INNER JOIN temp
+            ON temp.UNIQUE_ID = {table_name}.UNIQUE_ID
+            ORDER BY temp.GAME_DATE ASC;
+            """
+            self.cursor.execute(query)
+            selection = self.cursor.fetchall()
+            for row in selection:
+                id, data = row[0], row[1:]
+                cols_at_unique_id[id] += data
+        self.cursor.execute(drop_temp_cmd)
+        # Keep rows with all fields
+        selections = [
+            tuple(cols_at_unique_id[id]) for id in unique_ids if len(cols_at_unique_id[id]) == len(self.flattened_columns)
+        ]
+        return selections, latest_season
     
-    def get_team_id(self, team_abbr, season):
+    def _query_season_means_stds(self, season : int, table, cols_to_select):
+        # Select from previous season
+        if season > 21983:
+            season -= 1
+        cols_to_select_str = ', '.join(cols_to_select) 
         query = f"""
-        SELECT NEW_TEAM_ID
+        SELECT {cols_to_select_str}
+        FROM {table}
+        WHERE SEASON_ID = {season}
+        LIMIT 1;
+        """
+        self.cursor.execute(query)
+        return self.cursor.fetchall()
+    
+    def _query_team_id(self, season : int, team_abbr : str):
+        query = f"""
+        SELECT TEAM_ID
         FROM team_metadata
         WHERE SEASON_ID = {season}
         AND TEAM_ABBREVIATION = '{team_abbr}'
@@ -187,101 +212,167 @@ class SeasonSequenceDataset(Dataset):
         """
         self.cursor.execute(query)
         res = self.cursor.fetchall()
-        if not res:
-            return None
-        return res[0][0]
+        return res
 
-    def get_team_abbr(self, season, team_id=None):
-        if not team_id:
-            team_id = random.randint(0, 29)
+    def _query_team_abbr(self, season : int, team_id : str):
         query = f"""
         SELECT TEAM_ABBREVIATION
         FROM team_metadata
         WHERE SEASON_ID = {season}
-        AND NEW_TEAM_ID = {team_id}
+        AND TEAM_ID = {team_id}
         LIMIT 1;
         """
         self.cursor.execute(query)
         res = self.cursor.fetchall()
-        if not res:
-            return None
-        return res[0][0]
-
-
-    def __len__(self):
-        return len(self.seasons)
-
-    def __getitem__(self, idx, normalize=True):
-        # Get the date for the current index
-        season = self.seasons[idx]
-        # Get the sequence of rows corresponding to that date
-        season_sequence = self.get_full_season_sequence(season)
-        return season_sequence
-
+        return res
     
+    #### GROUPING METHODS
+    def group_by_col_from_raw(self, selection):
+        # Transpose the list of tuples
+        transposed_selection = list(zip(*selection))
+        
+        # Create a dictionary with the column names as keys
+        selection_dict = {col: list(transposed_selection[i]) for i, col in enumerate(self.flattened_columns)}
+        return selection_dict
     
+    def group_for_model_from_col(self, selection_dict):
+        new_dict = {}
+        cols_at_group = self.cols_at_group
+        for grouping, cols in cols_at_group.items():
+            new_dict[grouping] = []
+            for col in cols:
+                new_dict[grouping].append(selection_dict[col])
+        return new_dict
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-
-
-
-# Turns given sequence of features into one-hot encoded sequence of features
-def make_ohe(sequence : torch.Tensor, ohe_size=32, stack=True) -> torch.Tensor:
-    # NOTE: NumPy has better support for mapping
-    n, T, d = sequence.shape
-    ohe_sequence = []
-
-    for i in range(d):
-        # (1) Give each feature value an ID
-        feature_sequence = torch.Tensor.numpy(sequence[:, :, i])
+    #### TRANSFORMS
+    def ohe(self, feature_sequence, ohe_size=32):
+        # NOTE: NumPy has better support for mapping
+        # (1) Get unique features
         unique_values = np.unique(feature_sequence)
         id_mapping = dict(zip(unique_values, range(len(unique_values))))
         vectorized_id_mapping = np.vectorize(id_mapping.get)
-        
+            
         # (2) Map features to ID's; get OHE according to ID's
         feature_id_sequence = vectorized_id_mapping(feature_sequence)
-        feature_ohe_sequence = np.eye(ohe_size)[feature_id_sequence]
-        ohe_sequence.append(torch.from_numpy(feature_ohe_sequence).to(torch.float))
+        feature_sequence_ohe = np.eye(ohe_size)[feature_id_sequence]
+        feature_sequence_ohe = torch.tensor(feature_sequence_ohe)
+        return feature_sequence_ohe
     
-    if stack:
-        return torch.cat(ohe_sequence, dim=-1)
-    return ohe_sequence
+    
+    def process_for_normalize(self, col):
+        # Remove suffixes
+        col = col.replace('_for', '')
+        col = col.replace('_ag', '')
+        # Fix table prefixes before '.'
+        table, _, col = col.partition('.')
+        table += '_summary'
+        col = table + '.' + col
+        # Add suffixes
+        cols_to_select = [col + '_mean', col + '_std']
+        # Define new table
+        return table, cols_to_select
+    
+    def normalize(self, season, feature_sequence, col):
+        feature_sequence = torch.tensor(feature_sequence)
+        # Get info for query
+        table, cols_to_select = self.process_for_normalize(col)
+        # Query for mean, std
+        selection = self._query_season_means_stds(season, table, cols_to_select)
+        try:
+            selection = torch.tensor(selection).squeeze(dim=0)
+            mean, median = selection[0], selection[1]
+            # Apply to sequence
+            feature_sequence = (feature_sequence - mean) / median
+        except RuntimeError:
+            print(f" * Columns {cols_to_select} at season {season} is {selection}")
+            print(f" * Not normalizing")
+        return feature_sequence
+        
+        
+    def transform(self, selection_dict, season):
+        cols_at_transform = self.cols_at_transform
+        for transform, cols in cols_at_transform.items():
+            data_to_transform = [selection_dict[col] for col in cols]
+            if transform is None:
+                transformed_data = data_to_transform
+            elif transform == 'normalize':
+                # Call normalize
+                # Apply
+                normalize = lambda x : self.normalize(season, x[0], x[1])
+                normalize_input = list(zip(data_to_transform, cols))
+                transformed_data = list(map(normalize, normalize_input))
+            elif transform == 'ohe':
+                # Call make OHE
+                transformed_data = list(map(self.ohe, data_to_transform))
+                # Stack OHE's
+                #transformed_data = [data.flatten(start_dim=-2) for data in transformed_data]
+            for i, col in enumerate(cols):
+                selection_dict[col] = transformed_data[i]
+        return selection_dict
+    
+    #### GET METHODS/FUNCTIONALITY      
+    def get_full_season_data(self, season : int):
+        selection = self._query_full_season_data(season)
+        selection_dict = self.group_by_col_from_raw(selection)
+        selection_dict = self.transform(selection_dict, season)
+        selection_dict = self.group_for_model_from_col(selection_dict)
+        return selection_dict
+    
+    def get_partial_season_data(self, cutoff_date : str):
+        selection, season = self._query_partial_season_data(cutoff_date)
+        selection_dict = self.group_by_col_from_raw(selection)
+        selection_dict = self.transform(selection_dict, season)
+        selection_dict = self.group_for_model_from_col(selection_dict)
+        return selection_dict
+    
+    #### PYTORCH DATASET FUNCTIONALITY
+    def __len__(self):
+        return len(self.seasons)
+
+    def __getitem__(self, idx):
+        # Get the date for the current index
+        season = self.seasons[idx]
+        selection_dict = self.get_full_season_data(season)
+        return selection_dict
+
 
 #### COLLATOR
-def make_padding_masks(batch):
-    make_padding_mask = lambda sequence : torch.ones(sequence.shape[0])
-    padding_masks = list(map(make_padding_mask, batch))
-    padding_masks = pad_sequence(padding_masks, batch_first=True, padding_value=0)
-    return padding_masks.unsqueeze(dim=-1)
-
-
-def make_collate_fn(partition):
-    pass
-
-
-def collate_fn(batch, shuffle=False):    
-    batch = list(map(torch.tensor, batch))
-    padding_masks = make_padding_masks(batch)
-    batch = pad_sequence(batch, batch_first=True, padding_value=0)
+def collate_fn(batch, shuffle=False, check_padding=False):    
+    made_padding = False
     
-    kqs = make_ohe(batch[:, :, 0:2], shuffle)
-    vs = batch[:, :, 2:3]
-    targets = batch[:, :, 3:4]
-    batch = (kqs, vs, targets, padding_masks)
-    return batch    
+    keys = batch[0].keys()
+    dict_of_batch = {}
+    for key in keys:
+        samples_at_key = []
+        if key == 'metadata':
+            for dict_of_sample in batch:
+                samples_at_key.append(list(zip(*dict_of_sample[key])))
+            entry = samples_at_key
+        else:
+            for dict_of_sample in batch:
+                samples_at_key.append(
+                    torch.stack(dict_of_sample[key], dim=1)
+                )
+            entry = pad_sequence(
+                    samples_at_key, batch_first=True, padding_value=0
+            )
+            if not made_padding:
+                not_padding = [
+                    torch.ones(len(sample)) for sample in samples_at_key
+                ]
+                
+                if check_padding:
+                    for i, mask in enumerate(not_padding):
+                        print(len(mask))
+                        print(len(samples_at_key[i]))
+                        print()
+                    input()
+                
+                padding_entry = pad_sequence(
+                    not_padding, batch_first=True, padding_value=0
+                )
+                dict_of_batch['padding_masks'] = padding_entry.unsqueeze(dim=-1)
+                made_padding = True
+        dict_of_batch[key] = entry 
+    return dict_of_batch
 

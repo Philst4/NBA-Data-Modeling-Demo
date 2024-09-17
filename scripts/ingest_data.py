@@ -12,7 +12,7 @@ import pandas as pd
 
 # Local imports
 from utils.ingesting import (
-    ingest_from_nba_api,
+    ingestion_fns,
     write_to_csv
 )
 
@@ -65,6 +65,8 @@ if __name__ == "__main__":
     # (0) Read configuration
     with open('config.yaml', 'r') as file:
         config = yaml.safe_load(file)
+    ENDPOINT = config['endpoint']
+    ingestion_fn = ingestion_fns[ENDPOINT] # ingestion function
     RAW_DIR = config['raw_dir']
     RAW_FILE_NAME = config['raw_file_name']
     RAW_FILE_PATH = os.path.join(RAW_DIR, RAW_FILE_NAME)
@@ -73,11 +75,11 @@ if __name__ == "__main__":
     # (2) Read in relevant data from NBA API
     if os.path.exists(RAW_FILE_PATH):
         print(f"'{RAW_FILE_PATH}' exists; last read on '{last_read}'")
-        new_games = ingest_from_nba_api(start_date=last_read)
+        new_games = ingestion_fn(start_date=last_read)
         
     else:
         print(f"The file {RAW_FILE_PATH} does not exist")
-        new_games = ingest_from_nba_api(start_season=1983)
+        new_games = ingestion_fn(start_season=1983)
     
     # (3) Check how many games were read in
     if new_games is None:

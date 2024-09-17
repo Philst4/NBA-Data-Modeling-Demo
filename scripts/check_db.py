@@ -59,4 +59,4 @@ if __name__ == '__main__':
     page_size = cursor.fetchone()[0]
 
     db_size = page_count * page_size  # in bytes
-    print(f"\nSize of database: {db_size} bytes => ~{db_size/10e9:.3f} GB")
+    print(f"Size of database: {db_size} bytes => ~{db_size/1e9:.3f} GB")

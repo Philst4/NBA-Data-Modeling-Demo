@@ -6,7 +6,13 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(project_root)
 
 # External imports
-from nba_api.stats.endpoints import leaguegamefinder
+from nba_api.stats.endpoints import (
+    leaguegamefinder,
+    shotchartdetail
+)
+from nba_api.stats.static import (
+    teams
+)
 import pandas as pd
 from typing import Optional
 
@@ -25,9 +31,15 @@ def season_to_str(season : int) -> str:
     """    
     return f"{season}-{str(season + 1)[-2:]}"
 
+def write_to_csv(games : pd.DataFrame, write_path : str) -> None:
+    games.to_csv(write_path, index=False)
+    print(" * Data written to: ", write_path)
+    return
 
 
-def ingest_from_nba_api(
+#### INGESTION FUNCTION VARIANTS
+
+def ingest_from_leaguegamefinder(
     start_season: int = None,
     start_date: str = None
 ) -> Optional[pd.DataFrame]:
@@ -94,10 +106,10 @@ def ingest_from_nba_api(
         new_games = pd.concat(season_dfs)
         return new_games
 
-def write_to_csv(games : pd.DataFrame, write_path : str) -> None:
-    games.to_csv(write_path, index=False)
-    print(" * Data written to: ", write_path)
-    return
+# Dictionary of ingestion functions
+ingestion_fns = {
+    'leaguegamefinder' : ingest_from_leaguegamefinder,
+}
 
 
     

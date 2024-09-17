@@ -77,6 +77,7 @@ if __name__ == "__main__":
         games, 
         leave_out_cols=['UNIQUE_ID', 'GAME_ID', 'NEW_TEAM_ID']
     )
+    
     drop_cols(games, COLS_TO_DROP_B)
 
     # (5) 'Mirror' data to contain opposing stats, drop unneeded
@@ -92,6 +93,9 @@ if __name__ == "__main__":
     # (7) Deal with remaining NaN's
     deal_w_NaNs(games)
     
+    # Convert types...?
+    games['NEW_TEAM_ID_ag'] = games['NEW_TEAM_ID_ag'].astype(int)
+    
     # (8) Save cleaned data
     save_to_db(
         games, 
@@ -104,5 +108,6 @@ if __name__ == "__main__":
         summary_stats, 
         CLEAN_DIR,
         DB_NAME,
-        SUMMARY_TABLE_NAME
+        SUMMARY_TABLE_NAME,
+        index=True
     )
