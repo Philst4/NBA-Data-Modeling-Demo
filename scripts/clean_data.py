@@ -41,9 +41,13 @@ if __name__ == "__main__":
     RAW_FILE_PATH = os.path.join(RAW_DIR, RAW_FILE_NAME)
     CLEAN_DIR = config['clean_dir']
     DB_NAME = config['db_name']
-    MAIN_TABLE_NAME = config['main_table_name']
+    
+    data_config = config['data']
+    # Loop will start here
+    curr_table = data_config[0]
+    MAIN_TABLE_NAME = curr_table['table_name']
     SUMMARY_TABLE_NAME = MAIN_TABLE_NAME + '_summary'
-    cols_to_drop = config['main_cols_to_drop']
+    cols_to_drop = curr_table['cols_to_drop']
     
     # Make sure we don't lose info needed for the program to run correctly
     NEEDED_FOR_SUMMARY = ('SEASON_ID')

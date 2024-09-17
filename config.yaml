@@ -1,41 +1,65 @@
-# Raw data
-endpoint: 'leaguegamefinder'
+# Paths
 raw_dir: 'data/raw' 
 raw_file_name: 'raw.csv'
-
-# Clean data
 clean_dir: 'data/clean'
 db_name: 'my_database.db'
-
-game_metadata_table_name : 'game_metadata'
-game_meta_cols: 
-  - 'UNIQUE_ID'
-  - 'SEASON_ID'
-  - 'IS_HOME'
-  - 'GAME_ID'
-  - 'GAME_DATE'
-  - 'MATCHUP'
-  - 'WL'
-
-team_metadata_table_name : 'team_metadata'
-team_meta_cols:
-  - 'SEASON_ID'
-  - 'TEAM_ID'
-  - 'TEAM_ABBREVIATION'
-  - 'TEAM_NAME'
-
-main_table_name: 'game_data'
-main_cols_to_drop:
-  - 'SEASON_ID'
-  - 'GAME_ID'
-  - 'TEAM_ABBREVIATION'
-  - 'TEAM_NAME'
-  - 'GAME_DATE'
-  - 'MATCHUP'
-  - 'WL'
-  - 'FG_PCT'
-  - 'FT_PCT'
-  - 'FG3_PCT'
-
-# Modeling
 model_dir: 'models/'
+
+# Raw data
+ingest_data:
+  endpoints: 
+    - 'leaguegamefinder'
+
+# Metadata cleaning
+metadata:
+  games:
+    table_name : 'game_metadata'
+    columns: 
+      - 'UNIQUE_ID'
+      - 'SEASON_ID'
+      - 'IS_HOME'
+      - 'GAME_ID'
+      - 'GAME_DATE'
+      - 'MATCHUP'
+      - 'WL'
+  teams:
+    table_name : 'team_metadata'
+    columns:
+      - 'SEASON_ID'
+      - 'TEAM_ID'
+      - 'TEAM_ABBREVIATION'
+      - 'TEAM_NAME'
+
+# Data cleaning
+data:
+  - table_name: 'game_data'
+    cols_to_drop:
+      - 'SEASON_ID'
+      - 'GAME_ID'
+      - 'TEAM_ABBREVIATION'
+      - 'TEAM_NAME'
+      - 'GAME_DATE'
+      - 'MATCHUP'
+      - 'WL'
+      - 'FG_PCT'
+      - 'FT_PCT'
+      - 'FG3_PCT'
+
+# Data Loading
+ssd:
+  start_season : 21983
+  end_season : 22023
+  blueprint:
+    - table_name: game_metadata
+      channel:
+        - ['SEASON_ID', null, 'metadata']
+        - ['GAME_DATE', null, 'metadata']
+        - ['MATCHUP', null, 'metadata']
+  
+    - table_name: game_data
+      channel:
+        - ['NEW_TEAM_ID_for', 'ohe', 'kq']
+        - ['NEW_TEAM_ID_ag', 'ohe', 'kq']
+        - ['PLUS_MINUS_for', 'normalize', 'v']
+        - ['PLUS_MINUS_for', 'normalize', 't']
+

@@ -26,10 +26,12 @@ if __name__ == "__main__":
     RAW_FILE_PATH = os.path.join(RAW_DIR, RAW_FILE_NAME)
     CLEAN_DIR = config['clean_dir']
     DB_NAME = config['db_name']
-    GAME_METADATA_NAME = config['game_metadata_table_name']
-    GAME_META_COLS = config['game_meta_cols']
-    TEAM_META_COLS = config['team_meta_cols']
-    TEAM_METADATA_NAME = config['team_metadata_table_name']
+    
+    metadata_config = config['metadata']
+    GAME_METADATA_NAME = metadata_config['games']['table_name']
+    GAME_META_COLS = metadata_config['games']['columns']
+    TEAM_METADATA_NAME = metadata_config['teams']['table_name']
+    TEAM_META_COLS = metadata_config['teams']['columns']
     
     # (1) Read in raw data
     games = read_from_csv(RAW_FILE_PATH)

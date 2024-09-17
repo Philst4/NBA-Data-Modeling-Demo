@@ -13,7 +13,7 @@ class SeasonSequenceDataset(Dataset):
     def __init__(
         self, 
         db_path,
-        tables,
+        ssd_config,
         start_season=21983,
         end_season=22023,
     ):
@@ -22,54 +22,55 @@ class SeasonSequenceDataset(Dataset):
         self.cursor = self.conn.cursor()
         
         # List of table info
-        self.table_names = self.extract_table_names(tables)
-        self.cols_at_table = self.make_cols_at_table_map(tables)
-        self.flattened_columns = self.extract_columns_flattened(tables)
-        self.cols_at_transform = self.make_cols_at_transform_map(tables)
-        self.cols_at_group = self.make_cols_at_group_map(tables)
+        blueprint = ssd_config['blueprint']
+        self.table_names = self.extract_table_names(blueprint)
+        self.cols_at_table = self.make_cols_at_table_map(blueprint)
+        self.flattened_columns = self.extract_columns_flattened(blueprint)
+        self.cols_at_transform = self.make_cols_at_transform_map(blueprint)
+        self.cols_at_group = self.make_cols_at_group_map(blueprint)
         self.seasons = [row[0] for row in self._query_unique_seasons(
-            start_season, 
-            end_season
+            ssd_config['start_season'], 
+            ssd_config['end_season']
         )]
     
     #### INITIALIZATION METHODS
-    def extract_table_names(self, tables):
-        return [table['name'] for table in tables]
+    def extract_table_names(self, blueprint):
+        return [entry['table_name'] for entry in blueprint]
     
-    def make_cols_at_table_map(self, tables):
+    def make_cols_at_table_map(self, blueprint):
         res = {}
-        for table in tables:
-            table_name = table['name']
+        for entry in blueprint:
+            table_name = entry['table_name']
             res[table_name] = []
-            for col in table['columns']:
+            for col in entry['channel']:
                 res[table_name].append(col[0])
         return res
     
-    def extract_columns_flattened(self, tables):
+    def extract_columns_flattened(self, blueprint):
         columns = []
-        for table in tables:
-            table_name = table['name']
-            for col in table['columns']:
+        for entry in blueprint:
+            table_name = entry['table_name']
+            for col in entry['channel']:
                 col_name = col[0]
                 columns.append('.'.join((table_name, col_name)))
         return columns
     
-    def make_cols_at_transform_map(self, tables):
+    def make_cols_at_transform_map(self, blueprint):
         cols_at_transform = {}
-        for table in tables:
-            table_name = table['name']
-            for col, transform, _ in table['columns']:
+        for entry in blueprint:
+            table_name = entry['table_name']
+            for col, transform, _ in entry['channel']:
                 if transform not in cols_at_transform:
                     cols_at_transform[transform] = []
                 col = '.'.join((table_name, col))
                 cols_at_transform[transform].append(col)
         return cols_at_transform
     
-    def make_cols_at_group_map(self, tables):
+    def make_cols_at_group_map(self, blueprint):
         cols_at_grouping = {}
-        for table in tables:
-            table_name = table['name']
-            for col, _, grouping in table['columns']:
+        for entry in blueprint:
+            table_name = entry['table_name']
+            for col, _, grouping in entry['channel']:
                 if grouping not in cols_at_grouping:
                     cols_at_grouping[grouping] = []
                 col = '.'.join((table_name, col))
@@ -336,10 +337,14 @@ class SeasonSequenceDataset(Dataset):
         return selection_dict
 
 
-#### COLLATOR
-def collate_fn(batch, shuffle=False, check_padding=False):    
+#### COLLATOR (and padding)
+def make_padding_masks(samples):
+    not_padding = [torch.ones(len(sample)) for sample in samples]
+    padding_masks = pad_sequence(not_padding, batch_first=True, padding_value=0)
+    return padding_masks.unsqueeze(dim=-1)
+
+def collate_fn(batch):    
     made_padding = False
-    
     keys = batch[0].keys()
     dict_of_batch = {}
     for key in keys:
@@ -350,28 +355,10 @@ def collate_fn(batch, shuffle=False, check_padding=False):
             entry = samples_at_key
         else:
             for dict_of_sample in batch:
-                samples_at_key.append(
-                    torch.stack(dict_of_sample[key], dim=1)
-                )
-            entry = pad_sequence(
-                    samples_at_key, batch_first=True, padding_value=0
-            )
+                samples_at_key.append(torch.stack(dict_of_sample[key], dim=1))
+            entry = pad_sequence(samples_at_key, batch_first=True, padding_value=0)
             if not made_padding:
-                not_padding = [
-                    torch.ones(len(sample)) for sample in samples_at_key
-                ]
-                
-                if check_padding:
-                    for i, mask in enumerate(not_padding):
-                        print(len(mask))
-                        print(len(samples_at_key[i]))
-                        print()
-                    input()
-                
-                padding_entry = pad_sequence(
-                    not_padding, batch_first=True, padding_value=0
-                )
-                dict_of_batch['padding_masks'] = padding_entry.unsqueeze(dim=-1)
+                dict_of_batch['padding_masks'] = make_padding_masks(samples_at_key)
                 made_padding = True
         dict_of_batch[key] = entry 
     return dict_of_batch
