@@ -1,8 +1,9 @@
 # Paths
-raw_dir: 'data/raw' 
-clean_dir: 'data/clean'
+raw_dir: './data/raw' 
+clean_dir: './data/clean'
 db_name: 'my_database.db'
-model_dir: 'src/models'
+model_src_dir: './src/models'
+model_save_dir: './models'
 
 # File names
 raw_file_name: 'raw.csv'
@@ -69,7 +70,7 @@ ssd:
 
 # Model Architecture (handles dictionary)
 models:
-  architecture: 'model_1'
+  name: 'model_1'
   hyperparams:
     input_dim_v : 1
     embed_dim_v : 4
@@ -100,7 +101,7 @@ setups:
 
     # Model architecture
     model_config: 
-      architecture: 'base_model'
+      name: 'base_model'
       hyperparams:
         input_dim_v: 1
         embed_dim_v: 4
@@ -111,5 +112,5 @@ setups:
     # Training
     training_config: 
       lr: 0.5
-      epochs: 1
+      epochs: 25
   # specify epochs in CL argument

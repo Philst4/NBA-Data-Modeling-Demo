@@ -3,22 +3,6 @@ import numpy as np
 import lightning as L
 from lightning.pytorch import loggers as pl_loggers
 
-def normalize(values : torch.Tensor) -> torch.Tensor:
-    n, T, d = values.shape
-    # Want to normalize across 'T' dimension
-    means = values.mean(dim=1, keepdim=True)
-    stds = values.std(dim=1, keepdim=True)    
-    normalized_values = (values - means) / stds
-    return normalized_values, means, stds
-
-def denormalize(
-    normalized_values : torch.Tensor, 
-    means : torch.Tensor, 
-    stds : torch.Tensor
-):
-    values = (normalized_values * stds) + means
-    return values
-
 ###### LIGHTNING MODULE
 # Integrate lightning
 class LightningModel(L.LightningModule):

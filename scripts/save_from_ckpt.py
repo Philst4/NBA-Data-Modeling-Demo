@@ -19,18 +19,38 @@ if __name__ == "__main__":
     # Read in configuration
     with open('config.yaml', 'r') as file:
         config = yaml.safe_load(file)
-    ARCHITECTURE_DIR = config['architectures_dir']
-    sys.path.append(ARCHITECTURE_DIR)
+    MODEL_SRC_DIR = config['model_src_dir']
+    sys.path.append(MODEL_SRC_DIR)
+    MODEL_SAVE_DIR = config['model_save_dir']
     setup = config['setups']['A']
 
     # Necessary
     model_config = setup['model_config']
-    architecture = importlib.import_module(model_config['architecture'])
+    model_name = model_config['name']
+    model_file = importlib.import_module(model_name)
+    hyperparams = model_config['hyperparams']
     
-    # Logic
-    lightning_model = LightningModel.load_from_checkpoint("models/model.ckpt")
-    model = lightning_model.model
+    # Additional setup
+    model_ckpt_name = model_name + '.ckpt'
+    model_ckpt_path = os.path.join(MODEL_SAVE_DIR, model_ckpt_name)
+    model_pt_name = model_name + '.pt'
+    model_pt_path = os.path.join(MODEL_SAVE_DIR, model_pt_name)
+    
+    # Recover checkpoint
+    # NOTE: state of trained model saved in checkpoint, automatically loaded into 'model'
+    print("* Loading in model architecture...")
+    model = model_file.Model(**hyperparams)
+    print("* Loading in checkpoint...")
+    lightning_model = LightningModel.load_from_checkpoint(
+        model_ckpt_path,
+        model=model
+    )
+    
+    # Extract trained model
+    print("* Scripting model saved from checkpoint...")
+    model_to_script = lightning_model.model
     scripted_model = torch.jit.script(model)
-    scripted_model.save("models/scripted_model.pt")
+    scripted_model.save(model_pt_path)
+    print(f"* Model saved to '{model_pt_path}'")
     
     
