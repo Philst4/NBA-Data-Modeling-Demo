@@ -1,9 +1,12 @@
 # Paths
 raw_dir: 'data/raw' 
-raw_file_name: 'raw.csv'
 clean_dir: 'data/clean'
 db_name: 'my_database.db'
+architectures_dir: 'architectures/'
 model_dir: 'models/'
+
+# File names
+raw_file_name: 'raw.csv'
 
 # Raw data
 ingest_data:
@@ -47,19 +50,67 @@ data:
 
 # Data Loading
 ssd:
-  start_season : 21983
-  end_season : 22023
   blueprint:
-    - table_name: game_metadata
+    - table_name: 'game_metadata'
       channel:
         - ['SEASON_ID', null, 'metadata']
         - ['GAME_DATE', null, 'metadata']
         - ['MATCHUP', null, 'metadata']
   
-    - table_name: game_data
+    - table_name: 'game_data'
       channel:
         - ['NEW_TEAM_ID_for', 'ohe', 'kq']
         - ['NEW_TEAM_ID_ag', 'ohe', 'kq']
         - ['PLUS_MINUS_for', 'normalize', 'v']
         - ['PLUS_MINUS_for', 'normalize', 't']
+#    - table_name: 'game_data_summary'
+#      channel:
+#        - ['PLUS_MINUS_mean', null, 't_mean']
+#        - ['PLUS_MINUS_std', null, 't_std']
 
+# Model Architecture (handles dictionary)
+models:
+  architecture: 'model_1'
+  hyperparams:
+    input_dim_v : 1
+    embed_dim_v : 4
+    n_heads: 4
+    dropout: 0.1
+    output_dim: 1
+
+# Training Infra
+setups:
+  A:
+    # Data pipeline configuration
+    dataloading_config: 
+      ssd_blueprint:
+      - table_name: 'game_metadata'
+        channel:
+          - ['SEASON_ID', null, 'metadata']
+          - ['GAME_DATE', null, 'metadata']
+          - ['MATCHUP', null, 'metadata']
+      - table_name: 'game_data'
+        channel:
+          - ['NEW_TEAM_ID_for', 'ohe', 'kq']
+          - ['NEW_TEAM_ID_ag', 'ohe', 'kq']
+          - ['PLUS_MINUS_for', 'normalize', 'v']
+          - ['PLUS_MINUS_for', 'normalize', 'targets']
+      train_seasons: [22000, 22022]
+      val_seasons: [22023, 22023]
+      batch_size: 5
+
+    # Model architecture
+    model_config: 
+      architecture: 'base_model'
+      hyperparams:
+        input_dim_v: 1
+        embed_dim_v: 4
+        n_heads: 4
+        dropout: 0.1
+        output_dim: 1
+
+    # Training
+    training_config: 
+      lr: 0.5
+      epochs: 1
+  # specify epochs in CL argument

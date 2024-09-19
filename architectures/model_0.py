@@ -11,25 +11,6 @@ sys.path.append(project_root)
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn.utils.rnn import pad_sequence
-
-#### LOCAL IMPORTS
-from utils.modeling import (
-    make_padding_masks,
-    make_ohe
-)
-
-#### COLLATOR + MODEL ARCHITECTURE (PyTorch)
-def collate_fn(batch, shuffle=False):    
-    batch = list(map(torch.tensor, batch))
-    padding_masks = make_padding_masks(batch)
-    batch = pad_sequence(batch, batch_first=True, padding_value=0)
-    
-    kqs = make_ohe(batch[:, :, 0:2], shuffle)
-    vs = batch[:, :, 2:3]
-    targets = batch[:, :, 3:4]
-    batch = (kqs, vs, targets, padding_masks)
-    return batch
 
 class TransformerLayerA(nn.Module):
     def __init__(self, 

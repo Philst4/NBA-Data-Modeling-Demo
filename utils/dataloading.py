@@ -3,6 +3,7 @@ import numpy as np
 import torch
 from torch.utils.data import (
     Dataset,
+    DataLoader # DO NOT REMOVE
 )
 from torch.nn.utils.rnn import pad_sequence
 
@@ -13,25 +14,27 @@ class SeasonSequenceDataset(Dataset):
     def __init__(
         self, 
         db_path,
-        ssd_config,
-        start_season=21983,
-        end_season=22023,
+        blueprint,
+        seasons=None,
     ):
-    
         self.conn = sqlite3.connect(db_path)
         self.cursor = self.conn.cursor()
         
         # List of table info
-        blueprint = ssd_config['blueprint']
         self.table_names = self.extract_table_names(blueprint)
         self.cols_at_table = self.make_cols_at_table_map(blueprint)
         self.flattened_columns = self.extract_columns_flattened(blueprint)
         self.cols_at_transform = self.make_cols_at_transform_map(blueprint)
         self.cols_at_group = self.make_cols_at_group_map(blueprint)
-        self.seasons = [row[0] for row in self._query_unique_seasons(
-            ssd_config['start_season'], 
-            ssd_config['end_season']
-        )]
+        
+        # NOTE: seasons is a tuple indicating interval of seasons to include
+        if seasons is None:
+            self.seasons = None
+        else:
+            self.seasons = [row[0] for row in self._query_unique_seasons(
+                seasons[0], 
+                seasons[-1]
+            )]
     
     #### INITIALIZATION METHODS
     def extract_table_names(self, blueprint):
@@ -257,7 +260,7 @@ class SeasonSequenceDataset(Dataset):
         feature_id_sequence = vectorized_id_mapping(feature_sequence)
         feature_sequence_ohe = np.eye(ohe_size)[feature_id_sequence]
         feature_sequence_ohe = torch.tensor(feature_sequence_ohe)
-        return feature_sequence_ohe
+        return feature_sequence_ohe.to(torch.float)
     
     
     def process_for_normalize(self, col):
@@ -285,9 +288,8 @@ class SeasonSequenceDataset(Dataset):
             # Apply to sequence
             feature_sequence = (feature_sequence - mean) / median
         except RuntimeError:
-            print(f" * Columns {cols_to_select} at season {season} is {selection}")
-            print(f" * Not normalizing")
-        return feature_sequence
+            print(f" * Columns {cols_to_select} at season {season} is {selection}; not normalizing")
+        return feature_sequence.to(torch.float)
         
         
     def transform(self, selection_dict, season):
@@ -298,33 +300,44 @@ class SeasonSequenceDataset(Dataset):
                 transformed_data = data_to_transform
             elif transform == 'normalize':
                 # Call normalize
-                # Apply
                 normalize = lambda x : self.normalize(season, x[0], x[1])
                 normalize_input = list(zip(data_to_transform, cols))
                 transformed_data = list(map(normalize, normalize_input))
             elif transform == 'ohe':
-                # Call make OHE
+                # Call ohe
                 transformed_data = list(map(self.ohe, data_to_transform))
-                # Stack OHE's
-                #transformed_data = [data.flatten(start_dim=-2) for data in transformed_data]
             for i, col in enumerate(cols):
                 selection_dict[col] = transformed_data[i]
         return selection_dict
     
     #### GET METHODS/FUNCTIONALITY      
-    def get_full_season_data(self, season : int):
+    def get_full_season_data(
+        self, 
+        season : int, 
+        apply_transforms=True,
+        group_for_model=True
+    ):
         selection = self._query_full_season_data(season)
         selection_dict = self.group_by_col_from_raw(selection)
-        selection_dict = self.transform(selection_dict, season)
-        selection_dict = self.group_for_model_from_col(selection_dict)
+        if apply_transforms:
+            selection_dict = self.transform(selection_dict, season)
+        if group_for_model:
+            selection_dict = self.group_for_model_from_col(selection_dict)
         return selection_dict
     
-    def get_partial_season_data(self, cutoff_date : str):
+    def get_partial_season_data(
+        self, 
+        cutoff_date : str,
+        apply_transforms=True,
+        group_for_model=True
+    ):
         selection, season = self._query_partial_season_data(cutoff_date)
         selection_dict = self.group_by_col_from_raw(selection)
-        selection_dict = self.transform(selection_dict, season)
-        selection_dict = self.group_for_model_from_col(selection_dict)
-        return selection_dict
+        if apply_transforms:
+            selection_dict = self.transform(selection_dict, season)
+        if group_for_model:
+            selection_dict = self.group_for_model_from_col(selection_dict)
+        return selection_dict, season
     
     #### PYTORCH DATASET FUNCTIONALITY
     def __len__(self):

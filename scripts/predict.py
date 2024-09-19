@@ -1,6 +1,3 @@
-print(" * Handling imports ...")
-
-#### STD IMPORTS
 import sys
 import os
 from datetime import datetime
@@ -9,25 +6,21 @@ from datetime import datetime
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(project_root)
 
-#### EXTERNAL IMPORTS
+# External imports
+import yaml
 import torch
 
 
 #### LOCAL IMPORTS
-from config import (
-    CLEAN_DATA_DIR,
-    MODEL_DIR
-)
-from utils.data_loading import (
-    SeasonSequenceDataset
+# Local imports
+from utils.dataloading import (
+    SeasonSequenceDataset,
+    collate_fn,
+    DataLoader # Base PyTorch DataLoader
 )
 
-from utils.modeling import (
-    normalize,
-    denormalize
-)
-from architectures.model_0 import (
-    collate_fn
+from utils.training import (
+    LightningModel
 )
 
 import random
@@ -35,26 +28,29 @@ import random
 #### MAIN PROGRAM
 
 if __name__ == "__main__":
-    print(" * Setting configurations ... ")
-    db_path = '/'.join((CLEAN_DATA_DIR, 'my_database.db'))
-    table_name = 'my_table'
-    kq_cols = ['NEW_TEAM_ID_for', 'NEW_TEAM_ID_ag']
-    v_cols = ['PLUS_MINUS']
-    t_cols = ['PLUS_MINUS']
-    data_cols = kq_cols + v_cols + t_cols
+    # Read in configuration
+    with open('config.yaml', 'r') as file:
+        config = yaml.safe_load(file)
+    CLEAN_DIR = config['clean_dir']
+    DB_NAME = config['db_name']
+    DB_PATH = os.path.join(CLEAN_DIR, DB_NAME)
 
-    # Instantiate SSD for accessing data (use a lot of default values)
-    print(" * Instantiating database access ...")
-    ssd = SeasonSequenceDataset(
-        db_path,
-        table_name,
-        data_cols=data_cols
+    # ---- BEGIN SETUP ---- 
+    setup = config['setups']['A']
+    
+    # (A) SET UP DATALOADING
+    dataloading_config = setup['dataloading_config']
+    ssd_blueprint = dataloading_config['ssd_blueprint']
+    
+    # Initialize ssd
+    ssd  = SeasonSequenceDataset(
+        db_path=DB_PATH,
+        blueprint=ssd_blueprint
     )
     
+    # (B) LOAD IN SCRIPTED MODEL FOR INFERENCE
     # Load in model, set it for inference
-    print(" * Loading in model ... ")
-    model_path = '/'.join((MODEL_DIR, 'model_0', 'version_0', 'scripted_model.pt'))
-    model = torch.jit.load(model_path)
+    model = torch.jit.load('models/scripted_model.pt')
     model.eval()
     
     print("-- STARTING MAIN -- ")
@@ -67,31 +63,66 @@ if __name__ == "__main__":
             date = str(datetime.now().date())
         
         # (1) Load in data up to that date
-        sequence, season = ssd.get_partial_season_sequence(date, include_meta=False)
+        partial_season_data, season = ssd.get_partial_season_data(date)
         
         # (2) Find ID's of specified teams
-        home_team_id = ssd.get_team_id(home_team_abbr, season)
-        away_team_id = ssd.get_team_id(away_team_abbr, season)
-        if not home_team_id:
-            print(' * Home team not found')
-            home_team_abbr = 'RNG_HOME'
-            home_team_id = random.randint(0, 30)
-        if not away_team_id:
-            print(' * Away team not found')
-            away_team_abbr = 'RNG_AWAY'
-            away_team_id = random.randint(0, 30)
+        if False:
+            home_team_id = ssd._query_team_id(season, home_team_abbr)[0][0]
+            away_team_id = ssd._query_team_id(season, away_team_abbr)[0][0]
+            print(home_team_id)
+            print(away_team_id)
+        
+        # (3) Get OHE's; need to rewrite ohe
+        print(ssd.ohe([0]))
+        print(type(ssd.ohe([0])))
+        input()
+        kq_new = torch.stack([ssd.ohe(0), ssd.ohe(0)], dim=0)
+        print(f"kq_new : {kq_new.shape}")
+        input()
+        
+        for key, val in partial_season_data.items():
+            if isinstance(val, torch.Tensor):
+                print(f"OLD : {key}, {val.shape}")
+                if key == "kq":
+                    new_val = kq_new
+                elif key == "padding_masks":
+                    new_val = torch.ones((val.shape[1:]))
+                else:
+                    new_val = torch.zeros((val.shape[1:]))
+                new_val.unsqueeze(dim=0)
+                partial_season_data[key] = torch.concat((val, new_val), dim=0)
+                print(f"NEW : {key}, {val.shape}")
+            else:
+                pass
+        
+        # Pass through collator
+        partial_season_data = collate_fn([partial_season_data])
+        
+        
+        if False:
+            # TODO: FIX UNDEFINED BEHAVIOR
+            if not home_team_id:
+                print(' * Home team not found')
+                home_team_abbr = 'RNG_HOME'
+                home_team_id = random.randint(0, 30)
+            if not away_team_id:
+                print(' * Away team not found')
+                away_team_abbr = 'RNG_AWAY'
+                away_team_id = random.randint(0, 30)
         
         # (3) Append matchup in question so model makes prediction
         # NOTE: Only need to append matchup correctly; since
         #   statistical data won't be used for the prediction
-        if not len(sequence) > 0:
-            print('Please choose a valid date')
-            break
-        matchup_to_predict = [0] * len(sequence[-1])
-        matchup_to_predict[0] = home_team_id
-        matchup_to_predict[1] = away_team_id
-        sequence.append(tuple(matchup_to_predict))
+
+        kq_new = ssd.ohe([])
         
+        for key, val in partial_season_data.items():
+            if isinstance(val, torch.Tensor):
+                print(f"{key} : {val.shape}")
+            else:
+                print(f"{key} : {len(val)} sequence")
+        
+        exit()
         # (4) Pass sequence through model, only keep last prediction
         sequence = collate_fn([sequence])
         kq, v, _, _ = sequence
