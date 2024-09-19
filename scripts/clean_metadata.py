@@ -10,7 +10,7 @@ import yaml
 import pandas as pd
 
 # Local imports
-from utils.etl import (
+from src.etl import (
     read_from_csv,
     save_to_db
 )

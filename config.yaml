@@ -2,8 +2,7 @@
 raw_dir: 'data/raw' 
 clean_dir: 'data/clean'
 db_name: 'my_database.db'
-architectures_dir: 'architectures/'
-model_dir: 'models/'
+model_dir: 'src/models'
 
 # File names
 raw_file_name: 'raw.csv'

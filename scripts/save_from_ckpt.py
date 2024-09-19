@@ -11,7 +11,7 @@ import yaml
 import torch
 
 # Local imports
-from utils.training import (
+from src.training import (
     LightningModel
 )
 

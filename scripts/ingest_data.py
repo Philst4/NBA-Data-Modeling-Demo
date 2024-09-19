@@ -11,7 +11,7 @@ import yaml
 import pandas as pd
 
 # Local imports
-from utils.ingesting import (
+from src.ingesting import (
     ingestion_fns,
     write_to_csv
 )

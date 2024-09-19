@@ -13,13 +13,13 @@ import torch
 
 #### LOCAL IMPORTS
 # Local imports
-from utils.dataloading import (
+from src.dataloading import (
     SeasonSequenceDataset,
     collate_fn,
     DataLoader # Base PyTorch DataLoader
 )
 
-from utils.training import (
+from src.training import (
     LightningModel
 )
 

@@ -11,7 +11,7 @@ import pandas as pd
 import sqlite3
 
 # Local imports
-from utils.etl import (
+from src.etl import (
     read_from_csv, 
     make_id_map,
     add_cols,
