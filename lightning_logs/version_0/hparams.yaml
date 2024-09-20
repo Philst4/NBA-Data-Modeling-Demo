@@ -1,0 +1,3 @@
+loss_fn_class: !!python/name:torch.nn.modules.loss.MSELoss ''
+lr: 1
+optimizer_class: !!python/name:torch.optim.adam.Adam ''

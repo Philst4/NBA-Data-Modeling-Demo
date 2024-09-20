@@ -112,5 +112,5 @@ setups:
     # Training
     training_config: 
       lr: 0.5
-      epochs: 25
+      epochs: 100
   # specify epochs in CL argument
