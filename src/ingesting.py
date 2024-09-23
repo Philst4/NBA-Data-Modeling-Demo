@@ -22,21 +22,6 @@ from src.utils import (
     season_to_str
 )
 
-def season_to_str(season : int) -> str:
-    """Converts reference of season start to reference of entire season.
-
-    The resulting string can be used to specify queries for the NBA API.
-    Example use: season_to_str(2023) gives '2023-24'
-
-    Args: 
-        season: an int meant to reference the start of an NBA season 
-    
-    Returns:
-        A string referencing the entire season, meant to be used to 
-        query from the NBA API. Example use: season_to_str(2023) gives '2023-24'
-    """    
-    return f"{season}-{str(season + 1)[-2:]}"
-
 #### INGESTION FUNCTION VARIANTS
 
 def ingest_from_leaguegamefinder(
@@ -97,8 +82,10 @@ def ingest_from_leaguegamefinder(
         season_df_len = len(season_df)
         season_df = season_df.dropna(subset=['WL'])  # Drop games still in progress
         n_dropped = season_df_len - len(season_df)
-        print(f" - - {season_df_len} games ingested ({len(season_df)} kept)")
-        
+        string = f" - - {season_df_len} games ingested"
+        if n_dropped > 0:
+            string += f" (dropped {n_dropped} games in progress)"
+        print(string)    
         if len(season_df) > 0:
             season_dfs.append(season_df)
 

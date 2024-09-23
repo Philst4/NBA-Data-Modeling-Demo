@@ -9,6 +9,8 @@ sys.path.append(project_root)
 import yaml
 import pandas as pd
 import sqlite3
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 def season_to_str(season : int) -> str:
     """Converts reference of season start to reference of entire season.
@@ -152,21 +154,80 @@ def query_db(db_path : str, query : str) -> pd.DataFrame:
     return dataframe
 
 
+def generate_kde_plots(df, columns, home_column='IS_HOME', suffix='_for'):
+    """
+    Generates KDE plots for the specified columns from the dataframe.
+
+    Parameters:
+    df (pd.DataFrame): The dataframe containing the data.
+    columns (list of str): List of column names to generate plots for.
+    home_column (str): The column name indicating home/away games.
+    suffix (str): Suffix for column names indicating 'for' values (e.g., 'PTS_for').
+    nrows (int): Number of rows for the subplot grid.
+    ncols (int): Number of columns for the subplot grid.
+
+    Returns:
+    None
+    """
+    
+    # Set up the grid of KDE plots
+    fig, axes = plt.subplots(nrows=len(columns), ncols=2, figsize=(12, 4 * len(columns)))
+    axes = axes.flatten()  # Flatten the 2D array of axes to 1D for easy iteration
+
+    # Create a KDE plot for each column
+    for i, column in enumerate(columns):
+        # Define the axes for the home/away and combined plots
+        ax1, ax2 = axes[2 * i], axes[2 * i + 1]
+
+        # Get home and away values
+        home_values = df.loc[df[home_column] == 1, column + suffix]
+        away_values = df.loc[df[home_column] == 0, column + suffix]
+
+        # Plot the KDE for home/away
+        sns.kdeplot(home_values, ax=ax1, fill=True, color='blue', alpha=0.1, label='home')
+        sns.kdeplot(away_values, ax=ax1, fill=True, color='red', alpha=0.1, label='away')
+        
+        ax1.legend()
+        ax1.set_title(f'KDE Plot of {column} (home, away)')
+        ax1.set_xlabel(f'{column}')
+        ax1.set_ylabel('Density')
+        ax1.set_ylim(0, 0.08)
+        ax1.grid()
+
+        # Plot the KDE for combined data
+        values = df.loc[:, column + suffix]
+        sns.kdeplot(values, ax=ax2, fill=True, color='orange', alpha=0.2, label='home and away')
+        
+        ax2.legend()
+        ax2.set_title(f'KDE Plot of {column} (all)')
+        ax2.set_xlabel(f'{column}')
+        ax2.set_ylabel('Density')
+        ax2.set_ylim(0, 0.08)
+        ax2.grid()
+
+    # Adjust layout
+    plt.tight_layout()
+    plt.show()
+
+def get_summary_cols_map(cols):
+    map = {}
+    for col in cols:
+        stripped_col = col
+        stripped_col = stripped_col.replace('_ag', '')
+        stripped_col = stripped_col.replace('_for', '')
+        map[col] = (stripped_col + '_mean', stripped_col + '_std')
+    return map
+
+def get_summary_cols_str(summary_cols_map):
+    flattened_values = [col1 + ', ' + col2 for col1, col2 in list(summary_cols_map.values())]
+    flattened_values = list(set(flattened_values))
+    return ', '.join(flattened_values)
+
+
+
+
 def normalize(games : pd.DataFrame, summary_stats : pd.DataFrame) -> pd.DataFrame:
-    return
-    normalized_games = games.copy()
-    normalized_games[numerical_cols] = normalized_games[numerical_cols].astype(float)
-    for col in numerical_cols:
-        mean_col, std_col = summary_cols_map[col]
-        for season in list(summary_stats['SEASON_ID']):
-            season_values = cleaned_games.loc[cleaned_games['SEASON_ID'] == season, col]
-            season_mean = summary_stats.loc[summary_stats['SEASON_ID'] == season, mean_col].values
-            season_std = summary_stats.loc[summary_stats['SEASON_ID'] == season, std_col].values
-            normalized_season_values = (season_values - season_mean) / season_std
-            normalized_games.loc[normalized_games['SEASON_ID'] == season, col] = normalized_season_values
-
-    normalized_games = normalized_games.dropna()
-
+    pass
 
 def get_rolling(games : pd.DataFrame, window_size : int=0) -> None:
     return

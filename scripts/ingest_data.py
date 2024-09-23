@@ -1,6 +1,5 @@
 import sys
 import os
-from datetime import datetime
 
 # Add the project root to the Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -12,7 +11,8 @@ import pandas as pd
 
 # Local imports
 from src.utils import (
-    save_as_csv
+    save_as_csv,
+    read_from_csv
 )
 
 from src.ingesting import (
@@ -22,8 +22,6 @@ from src.ingesting import (
 if __name__ == "__main__":
     
     print("--- RUNNING DATA INGESTION SCRIPT ---")
-    
-    last_read = datetime.today().strftime('%Y-%m-%d')
     
     # (0) Read configuration
     with open('config.yaml', 'r') as file:
@@ -40,10 +38,13 @@ if __name__ == "__main__":
     # (1) Check if raw exists, and
     # (2) Read in relevant data from NBA API
     if os.path.exists(RAW_FILE_PATH):
-        print(f"'{RAW_FILE_PATH}' exists; last read on '{last_read}'")
-        print(f" Will read in all potential new games")
+        existing_games = read_from_csv(RAW_FILE_PATH)
+        last_read = existing_games['GAME_DATE'].max()
+        print(f"Existing reserve at '{RAW_FILE_PATH}' exists; last read on '{last_read}'")
+        print(f" Will read in all seasons with potential new games")
         new_games = ingestion_fn(start_date=last_read)
     else:
+        existing_games = None
         print(f"The file {RAW_FILE_PATH} does not exist")
         new_games = ingestion_fn(start_season=1983)
     
@@ -61,15 +62,14 @@ if __name__ == "__main__":
     new_games['UNIQUE_ID'] = new_games.apply(lambda row: str(row['GAME_ID']) + '_' + str(row['IS_HOME']), axis=1)
     
     # (6) Handle integrating into existing reserve
-    if os.path.exists(RAW_FILE_PATH):
-        existing_games = pd.read_csv(RAW_FILE_PATH)
+    if existing_games is not None:
         len_existing = len(existing_games)
         print(f" * {len_existing} games found in existing reserve")
         games = pd.concat((existing_games, new_games), ignore_index=True)    
         games = games.drop_duplicates(subset=['UNIQUE_ID'])
         len_total = len(games)
         n_duplicates = (len_existing + len_new) - len_total
-        print(f" * {n_duplicates} duplicates found, added {len_total - len_existing} new games to existing reserve")
+        print(f" * {n_duplicates} games found in existing reserve, added {len_total - len_existing} new games")
     else:
         games = new_games
         len_total = len(games)

@@ -76,7 +76,11 @@ def mirror(
     games.loc[away_condn, cols_ag] = games.loc[home_condn, cols_for].values
     games.loc[home_condn, cols_ag] = games.loc[away_condn, cols_for].values
 
-def get_summary_stats(games : pd.DataFrame, leave_out_cols, debug=False) -> None:
+def get_summary_stats(
+    games : pd.DataFrame, 
+    leave_out_cols, 
+    debug=False
+) -> None:
     print(" * Making summary table with season means, stds of each stat ... ")
     
     # If stat has '_for' and '_ag', only using '_for' for calculations
