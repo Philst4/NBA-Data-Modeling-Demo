@@ -64,7 +64,6 @@ if __name__ == "__main__":
     pass
 
     # (3) Add new features, drop unneeded after
-    # For team_metadata, we want 'NEW_TEAM_ID'
     cols_to_add_t = ['NEW_TEAM_ID']
     dependencies_t = [['TEAM_ID']]
     maps_t = [make_id_map(games, 'TEAM_ID')]

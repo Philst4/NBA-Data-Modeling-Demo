@@ -91,7 +91,7 @@ class SeasonSequenceDataset(Dataset):
         self.cursor.execute(query)
         return self.cursor.fetchall()
     
-    def _query_full_season_data(self, season, include_cols=True):
+    def _query_full_season_data(self, season : int, include_cols : bool=True):
         create_temp_cmd = f"""
         CREATE TABLE temp AS 
         SELECT UNIQUE_ID, GAME_DATE
@@ -192,14 +192,15 @@ class SeasonSequenceDataset(Dataset):
         ]
         return selections, latest_season
     
-    def _query_season_means_stds(self, season : int, table, cols_to_select):
+    def _query_season_means_stds(self, season : int, table_name : str, cols_to_select):
         # Select from previous season
         if season > 21983:
-            season -= 1
+            pass
+            #season -= 1
         cols_to_select_str = ', '.join(cols_to_select) 
         query = f"""
         SELECT {cols_to_select_str}
-        FROM {table}
+        FROM {table_name}
         WHERE SEASON_ID = {season}
         LIMIT 1;
         """
@@ -208,7 +209,7 @@ class SeasonSequenceDataset(Dataset):
     
     def _query_team_id(self, season : int, team_abbr : str):
         query = f"""
-        SELECT TEAM_ID
+        SELECT NEW_TEAM_ID
         FROM team_metadata
         WHERE SEASON_ID = {season}
         AND TEAM_ABBREVIATION = '{team_abbr}'
@@ -223,7 +224,7 @@ class SeasonSequenceDataset(Dataset):
         SELECT TEAM_ABBREVIATION
         FROM team_metadata
         WHERE SEASON_ID = {season}
-        AND TEAM_ID = {team_id}
+        AND NEW_TEAM_ID = {team_id}
         LIMIT 1;
         """
         self.cursor.execute(query)
@@ -249,10 +250,11 @@ class SeasonSequenceDataset(Dataset):
         return new_dict
     
     #### TRANSFORMS
-    def ohe(self, feature_sequence, ohe_size=32):
+    def ohe(self, feature_sequence, ohe_size : int=32):
         # NOTE: NumPy has better support for mapping
         # (1) Get unique features
-        unique_values = np.unique(feature_sequence)
+        assert(len(np.unique(feature_sequence)) <= ohe_size), "Too many unique values"
+        unique_values = np.arange(0, ohe_size)
         id_mapping = dict(zip(unique_values, range(len(unique_values))))
         vectorized_id_mapping = np.vectorize(id_mapping.get)
             
@@ -263,34 +265,48 @@ class SeasonSequenceDataset(Dataset):
         return feature_sequence_ohe.to(torch.float)
     
     
-    def process_for_normalize(self, col):
+    def process_for_normalize(self, col : str):
         # Remove suffixes
         col = col.replace('_for', '')
         col = col.replace('_ag', '')
         # Fix table prefixes before '.'
-        table, _, col = col.partition('.')
-        table += '_summary'
-        col = table + '.' + col
+        table_name, _, col = col.partition('.')
+        table_name += '_summary'
+        col = table_name + '.' + col
         # Add suffixes
         cols_to_select = [col + '_mean', col + '_std']
         # Define new table
-        return table, cols_to_select
+        return table_name, cols_to_select
     
-    def normalize(self, season, feature_sequence, col):
+    def normalize(self, season : int, feature_sequence, col : str):
         feature_sequence = torch.tensor(feature_sequence)
         # Get info for query
-        table, cols_to_select = self.process_for_normalize(col)
+        table_name, cols_to_select = self.process_for_normalize(col)
         # Query for mean, std
-        selection = self._query_season_means_stds(season, table, cols_to_select)
+        selection = self._query_season_means_stds(season, table_name, cols_to_select)
         try:
             selection = torch.tensor(selection).squeeze(dim=0)
-            mean, median = selection[0], selection[1]
+            mean, std = selection[0], selection[1]
             # Apply to sequence
-            feature_sequence = (feature_sequence - mean) / median
+            feature_sequence = (feature_sequence - mean) / std
         except RuntimeError:
             print(f" * Columns {cols_to_select} at season {season} is {selection}; not normalizing")
         return feature_sequence.to(torch.float)
-        
+    
+    def normalize2(self, season : int, feature_sequence, col : str):
+        feature_sequence = torch.tensor(feature_sequence)
+        # Get info for query
+        table_name, cols_to_select = self.process_for_normalize(col)
+        # Query for mean, std
+        selection = self._query_season_means_stds(season, table_name, cols_to_select)
+        try:
+            selection = torch.tensor(selection).squeeze(dim=0)
+            mean, std = selection[0], selection[1]
+            # Apply to sequence
+            feature_sequence = (feature_sequence - mean) / std
+        except RuntimeError:
+            print(f" * Columns {cols_to_select} at season {season} is {selection}; not normalizing")
+        return feature_sequence.to(torch.float), mean, std
         
     def transform(self, selection_dict, season):
         cols_at_transform = self.cols_at_transform
@@ -299,10 +315,13 @@ class SeasonSequenceDataset(Dataset):
             if transform is None:
                 transformed_data = data_to_transform
             elif transform == 'normalize':
-                # Call normalize
                 normalize = lambda x : self.normalize(season, x[0], x[1])
-                normalize_input = list(zip(data_to_transform, cols))
-                transformed_data = list(map(normalize, normalize_input))
+                data_to_normalize = list(zip(data_to_transform, cols))
+                transformed_data = list(map(normalize, data_to_normalize))
+                
+                """normalize = lambda x : self.normalize(season, x[0], x[1])
+                data_to_normalize = list(zip(data_to_transform, cols))
+                transformed_data = list(map(normalize, data_to_normalize))"""
             elif transform == 'ohe':
                 # Call ohe
                 transformed_data = list(map(self.ohe, data_to_transform))
@@ -314,8 +333,8 @@ class SeasonSequenceDataset(Dataset):
     def get_full_season_data(
         self, 
         season : int, 
-        apply_transforms=True,
-        group_for_model=True
+        apply_transforms : bool=True,
+        group_for_model : bool=True
     ):
         selection = self._query_full_season_data(season)
         selection_dict = self.group_by_col_from_raw(selection)
@@ -328,8 +347,8 @@ class SeasonSequenceDataset(Dataset):
     def get_partial_season_data(
         self, 
         cutoff_date : str,
-        apply_transforms=True,
-        group_for_model=True
+        apply_transforms : bool=True,
+        group_for_model : bool=True
     ):
         selection, season = self._query_partial_season_data(cutoff_date)
         selection_dict = self.group_by_col_from_raw(selection)
@@ -343,7 +362,7 @@ class SeasonSequenceDataset(Dataset):
     def __len__(self):
         return len(self.seasons)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx : int):
         # Get the date for the current index
         season = self.seasons[idx]
         selection_dict = self.get_full_season_data(season)
@@ -356,7 +375,7 @@ def make_padding_masks(samples):
     padding_masks = pad_sequence(not_padding, batch_first=True, padding_value=0)
     return padding_masks.unsqueeze(dim=-1)
 
-def collate_fn(batch):    
+def collate_fn(batch, include_meta=False):    
     made_padding = False
     keys = batch[0].keys()
     dict_of_batch = {}

@@ -1,126 +1,120 @@
-#### STD IMPORTS
 import sys
 import os
+import importlib
 
 # Add the project root to the Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(project_root)
 
-#### EXTERNAL IMPORTS
+# External imports
+import yaml
 import torch
-from torch.utils.data import DataLoader
-from torch import optim
-from torchsummary import summary
-import lightning as L
-from pytorch_lightning import loggers as pl_loggers
+from torch.nn import (
+    MSELoss
+)
+from torch.optim import (
+    Adam
+)
+from lightning import Trainer
+#from pytorch_lightning.loggers import TensorBoardLogger
 
-#### LOCAL IMPORTS
-from config import (
-    CLEAN_DATA_DIR,
-    MODEL_DIR
-)
-from utils.data_loading import (
-    SeasonSequenceDataset
-)
-from architectures.model_0 import (
+# Local imports
+from src.dataloading import (
+    SeasonSequenceDataset,
     collate_fn,
-    Model
+    DataLoader # Base PyTorch DataLoader
 )
 
-from utils.modeling import (
+from src.training import (
     LightningModel
 )
-        
-#### MAIN PROGRAM
-if __name__ == '__main__':
-    print(" * Running...")
-    
-    #### DATALOADING SETUP
-    # Set configuration for SequenceDataset
-    meta_cols = ['SEASON_ID', 'GAME_DATE', 'MATCHUP']
-    kq_cols = ['NEW_TEAM_ID_for', 'NEW_TEAM_ID_ag']
-    v_cols = ['PLUS_MINUS']
-    t_cols = ['PLUS_MINUS']
-    data_cols = kq_cols + v_cols + t_cols
-    
-    # Define path, table name
-    db_path = '/'.join((CLEAN_DATA_DIR, 'my_database.db'))
-    table_name = 'my_table'
 
-    train_ssd = SeasonSequenceDataset(
-        db_path=db_path,
-        table_name=table_name,
-        data_cols=data_cols,
-        meta_cols=meta_cols,
-        start_season=21983,
-        end_season=22022
-    )
+if __name__ == '__main__':
+    # Read in configuration
+    with open('config.yaml', 'r') as file:
+        config = yaml.safe_load(file)
+    CLEAN_DIR = config['clean_dir']
+    DB_NAME = config['db_name']
+    DB_PATH = os.path.join(CLEAN_DIR, DB_NAME)
+    MODEL_SRC_DIR = config['model_src_dir']
+    sys.path.append(MODEL_SRC_DIR)
+    MODEL_SAVE_DIR = config['model_save_dir']
     
+    # ---- BEGIN SETUP ---- 
+    setup = config['setups']['A']
+    
+    # (A) SET UP DATALOADING
+    dataloading_config = setup['dataloading_config']
+    ssd_blueprint = dataloading_config['ssd_blueprint']
+    train_seasons = dataloading_config['train_seasons']
+    val_seasons = dataloading_config['val_seasons']
+    batch_size = dataloading_config['batch_size']
+    
+    # Initialize train_ssd, val_ssd
+    train_ssd  = SeasonSequenceDataset(
+        db_path=DB_PATH,
+        blueprint=ssd_blueprint,
+        seasons=train_seasons
+    )
     val_ssd = SeasonSequenceDataset(
-        db_path=db_path,
-        table_name=table_name,
-        data_cols=data_cols,
-        meta_cols=meta_cols,
-        start_season=22022,
-        end_season=22023
+        db_path=DB_PATH,
+        blueprint=ssd_blueprint,
+        seasons=val_seasons
     )
     
-    shuffling_collate_fn = lambda x : collate_fn(x, shuffle=True)
-    trainloader = DataLoader(
-        train_ssd, 
-        batch_size=5, 
-        collate_fn=shuffling_collate_fn, 
-        shuffle=True
-    ) 
-    
-    valloader = DataLoader(
-        val_ssd, 
-        batch_size=1, 
-        collate_fn=shuffling_collate_fn
+    # Initialize train_loader, val_loader
+    train_loader = DataLoader(
+        dataset=train_ssd, 
+        collate_fn=collate_fn, 
+        batch_size=batch_size
+    )
+    val_loader = DataLoader(
+        dataset=val_ssd,
+        collate_fn=collate_fn,
+        batch_size=batch_size
     )
     
-    #### PYTORCH MODEL SETUP
-    # Set configuration for PyTorch model
-    input_dim_kq = 64
-    input_dim_v = 1
-    embed_dim_kq = 128 # make 256+
-    embed_dim_v = 128 # make 256+
-    output_dim = 1
-    n_heads = 4
+    # (B) SET UP PYTORCH MODEL
+    model_config = setup['model_config']
+    model_name = model_config['name']
+    model_file = importlib.import_module(model_name)
+    hyperparams = model_config['hyperparams']
+
+    # Initialize model
+    model = model_file.Model(**hyperparams)
     
-    # Set configuration for training model in lightning
-    loss_fn_class = torch.nn.MSELoss
-    optimizer_class = optim.Adam
-    lr = 0.0025
+    # (C) SET UP LIGHTNING
+    training_config = setup['training_config']
+    loss_fn_class = MSELoss
+    optimizer_class = Adam
+    lr = training_config['lr']
+    epochs = training_config['epochs']
     
-    # Instantiate PyTorch model (with summary)
-    model = Model(input_dim_kq, input_dim_v, embed_dim_kq, embed_dim_v, output_dim, 4)
-    summary(model, [(1230, input_dim_kq), (1230, input_dim_v)], batch_size=1)
-    
-    #### LIGHTNING SETUP
-    # Instantiate lightning module, logger, trainer
-    l_model = LightningModel(
-        model, 
-        loss_fn_class, 
-        optimizer_class, 
-        lr,
-        debug=False,
-        normalize=True
-    )
-    logger = pl_loggers.CSVLogger(MODEL_DIR, name="model_0", version="version_0")
-    trainer = L.Trainer(
-        max_epochs=50,
-        accelerator="auto",
-        devices=1,
-        log_every_n_steps=1,
-        logger=logger
+    # Initialize LightningModule
+    lightning_model = LightningModel(
+        model=model,
+        loss_fn_class=loss_fn_class,
+        optimizer_class=optimizer_class,
+        lr=lr
     )
     
-    #### FIT THE MODEL
-    trainer.fit(l_model, train_dataloaders=trainloader, val_dataloaders=valloader)
+    model_save_name = model_name + '.ckpt'
+    model_save_path = os.path.join(MODEL_SAVE_DIR, model_save_name)
     
-    #### TRACE + SAVE MODEL
-    scripted_model = torch.jit.script(model)
-    model_path = '/'.join((MODEL_DIR, 'model_0', 'version_0', 'scripted_model.pt'))
-    scripted_model.save(model_path)
-    print(f'Model saved to {model_path}')
+    # Initialize logger
+    #logger = TensorBoardLogger("logs/", name="base_model")
+    
+    # Initialize trainer
+    trainer = Trainer(max_epochs=epochs) #, logger=logger)
+    
+    # TRAINING
+    print("Training for 5 epochs")
+    trainer.fit(
+        lightning_model, 
+        train_loader,
+        val_loader
+    )
+    print(f"Done training")
+    model_save_name = model_name + '.ckpt'
+    model_save_path = os.path.join(MODEL_SAVE_DIR, model_save_name)
+    trainer.save_checkpoint(model_save_path)

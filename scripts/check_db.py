@@ -19,6 +19,8 @@ if __name__ == '__main__':
     DB_NAME = config['db_name']
     DB_PATH = os.path.join(CLEAN_DIR, DB_NAME)
     
+    assert(os.path.exists(DB_PATH)), f"Database not found at '{DB_PATH}'"
+    
     # Connect to your SQLite database
     conn = sqlite3.connect(DB_PATH)
 

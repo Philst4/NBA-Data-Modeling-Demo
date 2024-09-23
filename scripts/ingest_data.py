@@ -13,7 +13,7 @@ import pandas as pd
 # Local imports
 from src.ingesting import (
     ingestion_fns,
-    write_to_csv
+    save_as_csv
 )
 
 def read_last_run(file_path):
@@ -78,6 +78,7 @@ if __name__ == "__main__":
     # (2) Read in relevant data from NBA API
     if os.path.exists(RAW_FILE_PATH):
         print(f"'{RAW_FILE_PATH}' exists; last read on '{last_read}'")
+        print(f" Will read in all potential new games")
         new_games = ingestion_fn(start_date=last_read)
     else:
         print(f"The file {RAW_FILE_PATH} does not exist")
@@ -85,10 +86,10 @@ if __name__ == "__main__":
     
     # (3) Check how many games were read in
     if new_games is None:
-        print('No games ingested')
+        print(' * No games ingested')
         exit()
     len_new = len(new_games)
-    print(f"{len_new} games ingested")
+    print(f" * {len_new} total games ingested")
 
     # (4) Add 'IS_HOME'
     new_games['IS_HOME'] = new_games.apply(lambda row : int('vs.' in row['MATCHUP']), axis=1)
@@ -100,7 +101,7 @@ if __name__ == "__main__":
     if os.path.exists(RAW_FILE_PATH):
         existing_games = pd.read_csv(RAW_FILE_PATH)
         len_existing = len(existing_games)
-        print(f"{len_existing} games found in existing reserve")
+        print(f" * {len_existing} games found in existing reserve")
         games = pd.concat((existing_games, new_games), ignore_index=True)    
         games = games.drop_duplicates(subset=['UNIQUE_ID'])
         len_total = len(games)
@@ -111,8 +112,9 @@ if __name__ == "__main__":
         len_total = len(games)
     
     # (7) Save file
-    write_to_csv(
+    save_as_csv(
         games=games, 
-        write_path=RAW_FILE_PATH
+        write_dir=RAW_DIR,
+        csv_name=RAW_FILE_NAME,
     )
-    print(f"{len_total} games in the reserve at {RAW_FILE_PATH}")
+    print(f"{len_total} games in the reserve at '{RAW_FILE_PATH}'")

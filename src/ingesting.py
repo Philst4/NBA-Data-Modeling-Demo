@@ -1,5 +1,6 @@
 import sys
 import os
+import warnings
 
 # Add the project root to the Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -31,9 +32,16 @@ def season_to_str(season : int) -> str:
     """    
     return f"{season}-{str(season + 1)[-2:]}"
 
-def write_to_csv(games : pd.DataFrame, write_path : str) -> None:
+def save_as_csv(
+    games : pd.DataFrame, 
+    write_dir : str,
+    csv_name : str
+) -> None:
+    if not os.path.exists(write_dir):
+        os.makedirs(write_dir, exist_ok=True)
+    write_path = os.path.join(write_dir, csv_name)
     games.to_csv(write_path, index=False)
-    print(" * Data written to: ", write_path)
+    print(f" * Data written to: {write_path}")
     return
 
 
@@ -57,6 +65,9 @@ def ingest_from_leaguegamefinder(
     
     # Ensure only one of start_season or start_date is provided
     assert not (start_season and start_date), "Provide either 'start_season' or 'start_date', not both."
+
+    # Suppress the FutureWarning to avoid seeing it for now
+    warnings.simplefilter(action='ignore', category=FutureWarning)
 
     current_season = pd.Timestamp.now().year
 
@@ -94,7 +105,7 @@ def ingest_from_leaguegamefinder(
         season_df_len = len(season_df)
         season_df = season_df.dropna(subset=['WL'])  # Drop games still in progress
         n_dropped = season_df_len - len(season_df)
-        print(f" - - {season_df_len} ingested, {n_dropped} in progress, {len(season_df)} kept")
+        print(f" - - {season_df_len} games ingested ({len(season_df)} kept)")
         
         if len(season_df) > 0:
             season_dfs.append(season_df)

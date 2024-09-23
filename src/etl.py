@@ -1,3 +1,5 @@
+import os
+
 import pandas as pd
 import numpy as np
 import sqlite3
@@ -5,6 +7,8 @@ import sqlite3
 
 def read_from_csv(read_path : str) -> pd.DataFrame:
     print(" * Reading in data from csv ...")
+    assert(os.path.exists(read_path)), f"{read_path} not found"
+    
     return pd.read_csv(read_path)
 
 
@@ -110,7 +114,10 @@ def save_to_db(
     table_name : str,
     index=False
 ) -> None:
-    write_path = '/'.join((write_dir, db_name))
+    if not os.path.exists(write_dir):
+        os.makedirs(write_dir, exist_ok=True)
+    
+    write_path = os.path.join(write_dir, db_name)
     conn = sqlite3.connect(write_path)
     df.to_sql(table_name, conn, if_exists='replace', index=index)
     conn.close()    

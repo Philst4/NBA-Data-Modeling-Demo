@@ -12,6 +12,8 @@ import pandas as pd
 # Local imports
 from src.etl import (
     read_from_csv,
+    make_id_map,
+    add_cols,
     save_to_db
 )
 
@@ -44,6 +46,17 @@ if __name__ == "__main__":
     # Remove repeats from team_metadata
     team_metadata = team_metadata.drop_duplicates(subset=['SEASON_ID', 'TEAM_ID'])
     team_metadata = team_metadata.reset_index(drop=True)
+    
+    # Add new team id to team metadata
+    cols_to_add_t = ['NEW_TEAM_ID']
+    dependencies_t = [['TEAM_ID']]
+    maps_t = [make_id_map(games, 'TEAM_ID')]
+    add_cols(
+        team_metadata, 
+        cols_to_add_t, 
+        dependencies_t, 
+        maps_t
+    )
     
     # (3) Set types (N/A)
     # Not needed
