@@ -6,24 +6,20 @@
 __pycache__/
 *.pyd
 
-# Ignore node_modules
-node_modules/
-
 # Virtual environment
 .venv/
 .new_venv/
 
 # Data
 data/
-
-# Tests
-tests/
-
 # Logs
 lightning_logs/
-
 # Serialized Models
 models/
 
+# Other to ignore (for now)
+#Tests
+tests/
 # Ignore web app for now
 app/
+package.json
