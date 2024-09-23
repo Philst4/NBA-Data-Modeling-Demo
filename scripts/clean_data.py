@@ -64,21 +64,12 @@ if __name__ == "__main__":
     pass
 
     # (3) Add new features, drop unneeded after
-    cols_to_add_t = ['NEW_TEAM_ID']
-    dependencies_t = [['TEAM_ID']]
-    maps_t = [make_id_map(games, 'TEAM_ID')]
-    add_cols(
-        games, 
-        cols_to_add_t, 
-        dependencies_t, 
-        maps_t
-    )
     drop_cols(games, ['TEAM_ID'])
 
     # (4) Generate table of summarizing stats, drop unneeded
     summary_stats = get_summary_stats(
         games, 
-        leave_out_cols=['UNIQUE_ID', 'GAME_ID', 'NEW_TEAM_ID']
+        leave_out_cols=['UNIQUE_ID', 'GAME_ID']
     )
     
     drop_cols(games, COLS_TO_DROP_B)
@@ -95,9 +86,6 @@ if __name__ == "__main__":
     
     # (7) Deal with remaining NaN's
     deal_w_NaNs(games)
-    
-    # Convert types...?
-    games['NEW_TEAM_ID_ag'] = games['NEW_TEAM_ID_ag'].astype(int)
     
     # (8) Save cleaned data
     save_to_db(

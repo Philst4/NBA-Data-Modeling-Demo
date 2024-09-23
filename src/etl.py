@@ -47,9 +47,17 @@ def add_cols(games : pd.DataFrame, cols_to_add : list[str], dependencies : list[
 
 def mirror(
     games : pd.DataFrame, 
-    cols_not_to_mirror=[]
+    cols_to_mirror=None,
+    cols_not_to_mirror=None,
 ) -> None:
     print(" * Mirroring data ...")
+    
+    error_str1 = "Neither cols_to_mirror or cols_not_to_mirror provided; please provide one (empty list accepted)"
+    assert(not (cols_to_mirror is None and cols_not_to_mirror is None)), error_str1
+    error_str2 = "Only provide one of cols_to_mirror and cols_not_to_mirror"
+    assert(not (cols_to_mirror is not None and cols_not_to_mirror is not None)), error_str2
+
+
     
     # First, save away_condn, home_condn
     games.sort_values(by='GAME_ID', inplace=True)
@@ -57,7 +65,8 @@ def mirror(
     home_condn = games['IS_HOME'] == 1
     
     # Identify columns to be mirrored; initialize new column names
-    cols_to_mirror = [col for col in list(games.columns) if col not in cols_not_to_mirror]
+    if cols_not_to_mirror is not None:
+        cols_to_mirror = [col for col in list(games.columns) if col not in cols_not_to_mirror]
     col_for_mapping = {col: col + '_for' for col in cols_to_mirror}
 
     # Rename columns existing columns to cols_for
