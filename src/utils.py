@@ -32,6 +32,6 @@ def summarize(games : pd.DataFrame) -> None:
 
     # Print rows     
     rows_per_game = games['GAME_ID'].value_counts().unique()
-    teams_per_game = games.groupby('GAME_ID')['TEAM_ID'].nunique().unique()
+    teams_per_game = games.groupby('GAME_ID')['UNIQUE_ID'].nunique().unique()
     print(f"\nUNIQUE ROW COUNTS PER GAME ID: {rows_per_game}")
-    print(f"UNIQUE TEAM COUNTS PER GAME ID: {teams_per_game}")
+    print(f"UNIQUE ID COUNTS PER GAME ID: {teams_per_game}")
