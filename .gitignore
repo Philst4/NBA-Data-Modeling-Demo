@@ -11,12 +11,16 @@ node_modules/
 
 # Virtual environment
 .venv/
+.new_venv/
 
 # Data
 data/
 
 # Tests
 tests/
+
+# Logs
+lightning_logs/
 
 # Serialized Models
 models/
