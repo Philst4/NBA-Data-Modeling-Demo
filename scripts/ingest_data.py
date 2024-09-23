@@ -11,50 +11,13 @@ import yaml
 import pandas as pd
 
 # Local imports
-from src.ingesting import (
-    ingestion_fns,
+from src.utils import (
     save_as_csv
 )
 
-def read_last_run(file_path):
-    if os.path.exists(file_path):
-        # Read the file's contents
-        with open(file_path, 'r') as file:
-            lines = file.readlines()
-        
-        # Get the last line
-        if lines:
-            last_line = lines[-1].strip()
-            # Extract the date part from the line
-            if last_line.startswith("Last run: "):
-                last_run_date = last_line[len("Last run: "):]
-                return last_run_date
-    return None
-
-def update_last_run(file_path):
-    # Get the current date in YYYY-MM-DD format
-    current_date = datetime.now().date().isoformat()
-
-    # Check if the file exists
-    if os.path.exists(file_path):
-        # Read the file's contents
-        with open(file_path, 'r') as file:
-            lines = file.readlines()
-        
-        # Update the last run line
-        # Assuming the line you want to update is the last line
-        if lines:
-            lines[-1] = f"Last run: {current_date}\n"
-        else:
-            lines.append(f"Last run: {current_date}\n")
-        
-        # Write the contents back to the file
-        with open(file_path, 'w') as file:
-            file.writelines(lines)
-    else:
-        # File does not exist, create it and write the initial line
-        with open(file_path, 'w') as file:
-            file.write(f"Last run: {current_date}\n")
+from src.ingesting import (
+    ingestion_fns
+)
 
 if __name__ == "__main__":
     

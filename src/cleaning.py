@@ -8,9 +8,7 @@ import sqlite3
 def read_from_csv(read_path : str) -> pd.DataFrame:
     print(" * Reading in data from csv ...")
     assert(os.path.exists(read_path)), f"{read_path} not found"
-    
     return pd.read_csv(read_path)
-
 
 def drop_cols(games : pd.DataFrame, cols_to_drop, verbose=False) -> None:
     if verbose:
@@ -36,14 +34,12 @@ def make_id_map(games : pd.DataFrame, old_id_col : str):
     unique_ids = sorted(list(games[old_id_col].unique()))
     return lambda x : dict(zip(unique_ids, range(len(unique_ids))))[x]
 
-
 def add_cols(games : pd.DataFrame, cols_to_add : list[str], dependencies : list[list[str]], maps) -> None:
     for i in range(0, len(cols_to_add)):
         new_col = cols_to_add[i]
         cols_depending_on = dependencies[i]
         map = maps[i]
         games[new_col] = games[cols_depending_on].map(map)
-
 
 def mirror(
     games : pd.DataFrame, 
@@ -56,8 +52,6 @@ def mirror(
     assert(not (cols_to_mirror is None and cols_not_to_mirror is None)), error_str1
     error_str2 = "Only provide one of cols_to_mirror and cols_not_to_mirror"
     assert(not (cols_to_mirror is not None and cols_not_to_mirror is not None)), error_str2
-
-
     
     # First, save away_condn, home_condn
     games.sort_values(by='GAME_ID', inplace=True)
@@ -81,7 +75,6 @@ def mirror(
     cols_for = list(col_for_mapping.values())
     games.loc[away_condn, cols_ag] = games.loc[home_condn, cols_for].values
     games.loc[home_condn, cols_ag] = games.loc[away_condn, cols_for].values
-
 
 def get_summary_stats(games : pd.DataFrame, leave_out_cols, debug=False) -> None:
     print(" * Making summary table with season means, stds of each stat ... ")
@@ -114,20 +107,3 @@ def deal_w_NaNs(games : pd.DataFrame) -> None:
     num_NaNs = games.isna().sum(axis=0).sum()
     num_NaN_rows = games.isna().any(axis=1).sum()
     print(f" * {num_NaNs} remaining NaN's in {num_NaN_rows} rows left!")
-  
-    
-def save_to_db(
-    df : pd.DataFrame, 
-    write_dir : str, 
-    db_name : str, 
-    table_name : str,
-    index=False
-) -> None:
-    if not os.path.exists(write_dir):
-        os.makedirs(write_dir, exist_ok=True)
-    
-    write_path = os.path.join(write_dir, db_name)
-    conn = sqlite3.connect(write_path)
-    df.to_sql(table_name, conn, if_exists='replace', index=index)
-    conn.close()    
-    print(f" * Table saved to '{write_path}' as '{table_name}' (run 'python scripts/check_db.py' for more info)")

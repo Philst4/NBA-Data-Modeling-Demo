@@ -10,12 +10,15 @@ import yaml
 import pandas as pd
 
 # Local imports
-from src.etl import (
-    read_from_csv,
+from src.cleaning import (
     make_id_map,
     add_cols,
     mirror,
     drop_cols,
+)
+
+from src.utils import (
+    read_from_csv,
     save_to_db
 )
 

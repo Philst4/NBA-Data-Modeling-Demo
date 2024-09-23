@@ -17,6 +17,11 @@ from nba_api.stats.static import (
 import pandas as pd
 from typing import Optional
 
+# Internal imports
+from src.utils import (
+    season_to_str
+)
+
 def season_to_str(season : int) -> str:
     """Converts reference of season start to reference of entire season.
 
@@ -31,19 +36,6 @@ def season_to_str(season : int) -> str:
         query from the NBA API. Example use: season_to_str(2023) gives '2023-24'
     """    
     return f"{season}-{str(season + 1)[-2:]}"
-
-def save_as_csv(
-    games : pd.DataFrame, 
-    write_dir : str,
-    csv_name : str
-) -> None:
-    if not os.path.exists(write_dir):
-        os.makedirs(write_dir, exist_ok=True)
-    write_path = os.path.join(write_dir, csv_name)
-    games.to_csv(write_path, index=False)
-    print(f" * Data written to: {write_path}")
-    return
-
 
 #### INGESTION FUNCTION VARIANTS
 
