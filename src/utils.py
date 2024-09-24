@@ -290,7 +290,7 @@ def check_df(games : pd.DataFrame, check_game_counts : bool=True) -> None:
 
 #### GENERATING PLOTS/VISUALS ####
 
-def generate_kde_plots(df, columns, home_column='IS_HOME', suffix='_for'):
+def generate_kde_plots(df, columns, suffix='_for'):
     """
     Generates KDE plots for the specified columns from the dataframe.
 
@@ -316,8 +316,8 @@ def generate_kde_plots(df, columns, home_column='IS_HOME', suffix='_for'):
         ax1, ax2 = axes[2 * i], axes[2 * i + 1]
 
         # Get home and away values
-        home_values = df.loc[df[home_column] == 1, column + suffix]
-        away_values = df.loc[df[home_column] == 0, column + suffix]
+        home_values = df.loc[df['UNIQUE_ID'].str.contains('_1', na=False), column + suffix]
+        away_values = df.loc[df['UNIQUE_ID'].str.contains('_0', na=False), column + suffix]
 
         # Plot the KDE for home/away
         sns.kdeplot(home_values, ax=ax1, fill=True, color='blue', alpha=0.1, label='home')
@@ -393,3 +393,6 @@ def generate_corr_matrices(games : pd.DataFrame):
     plt.tight_layout()
     plt.show()
 
+
+def generate_corr_vs_window():
+    pass
