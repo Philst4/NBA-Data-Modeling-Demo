@@ -27,6 +27,23 @@ def season_to_str(season : int) -> str:
     """    
     return f"{season}-{str(season + 1)[-2:]}"
 
+def get_summary_from_main(main_col):
+    stripped_col = main_col.replace('_for', '')
+    stripped_col = stripped_col.replace('_ag', '')
+    mean_col = stripped_col + '_mean'
+    std_col = stripped_col + '_std'
+    return mean_col, std_col
+
+def get_main_to_summary_map(main_cols):
+    map = {}
+    for col in main_cols:
+        mean_col, std_col = get_summary_from_main(col)
+        map[col] = {
+            'mean' : mean_col,
+            'std' : std_col
+        }
+    return map
+
 def save_as_csv(
     games : pd.DataFrame, 
     write_dir : str,
@@ -39,12 +56,10 @@ def save_as_csv(
     print(f" * Data written to: {write_path}")
     return
 
-
 def read_from_csv(read_path : str) -> pd.DataFrame:
     print(" * Reading in data from csv ...")
     assert(os.path.exists(read_path)), f"{read_path} not found"
     return pd.read_csv(read_path)
-
 
 def save_to_db(
     df : pd.DataFrame, 
@@ -61,44 +76,7 @@ def save_to_db(
     df.to_sql(table_name, conn, if_exists='replace', index=index)
     conn.close()    
     print(f" * Table saved to '{write_path}' as '{table_name}' (run 'python scripts/check_db.py' for more info)")
-
-
-def summarize(games : pd.DataFrame, check_game_counts : bool=True) -> None:
-    """Summarizes basic stats of given pd.DataFrame.
-
-    Prints the columns in games, the shape of games, and how many NaN's are in each column.
-    If there are no NaN's in a given column, omits it from print.
-
-    Args:
-        games : pd.DataFrame
-    Returns:
-        None
-    """
-
-    # Prints datatypes
-    print(f" --- DATATYPES --- ")
-    print(f"{games.dtypes}\n")
-
-    # Print number of rows and columns
-    n_rows, n_cols = games.shape
-    print(f" --- SHAPE --- ")
-    print(f"{n_rows} rows, {n_cols} columns \n")
-
-    # Prints number of NaN's by column
-    nan_counts = games.isna().sum()
-    nan_counts = nan_counts[nan_counts > 0].sort_values(ascending=False)
-    print(f" --- NaN's PER COLUMN --- ")
-    if len(nan_counts) == 0:
-        print(f"No NaN's found")
-    else:
-        print(f"{nan_counts[nan_counts > 0].sort_values(ascending=False)}")
-
-    # Print rows     
-    rows_per_game = games['GAME_ID'].value_counts().unique()
-    teams_per_game = games.groupby('GAME_ID')['UNIQUE_ID'].nunique().unique()
-    print(f"\nUNIQUE ROW COUNTS PER GAME ID: {rows_per_game}")
-    print(f"UNIQUE ID COUNTS PER GAME ID: {teams_per_game}")
-
+    
 
 def check_db(db_path : str) -> None:
     assert(os.path.exists(db_path)), f"Database not found at '{db_path}'"
@@ -152,6 +130,72 @@ def query_db(db_path : str, query : str) -> pd.DataFrame:
     dataframe = pd.read_sql_query(query, conn)
     conn.close()
     return dataframe
+
+
+def get_normalized_table(
+        db_path : str,
+        table_name : str
+    ) -> pd.DataFrame:
+    
+    # Query for main table
+    main_data = query_db(
+        db_path=db_path,
+        query=f"SELECT * FROM {table_name}"
+    )
+    
+    # Query for Season ID's, merge with main data
+    season_ids = query_db(
+        db_path=db_path,
+        query=f"SELECT UNIQUE_ID, SEASON_ID FROM game_metadata"
+    )
+    main_data = pd.merge(main_data, season_ids, on='UNIQUE_ID')
+
+    # List of columns to normalize (excluding identifiers)
+    cols_to_normalize = [col for col in main_data.columns if col not in ('UNIQUE_ID', 'SEASON_ID')]
+
+# Normalize each column by SEASON_ID
+    main_data[cols_to_normalize] = main_data.groupby('SEASON_ID')[cols_to_normalize].transform(
+        lambda x: (x - x.mean()) / x.std()
+    )
+    return main_data.drop('SEASON_ID', axis=1)  # Return normalized data without the SEASON_ID column
+
+
+def summarize(games : pd.DataFrame, check_game_counts : bool=True) -> None:
+    """Summarizes basic stats of given pd.DataFrame.
+
+    Prints the columns in games, the shape of games, and how many NaN's are in each column.
+    If there are no NaN's in a given column, omits it from print.
+
+    Args:
+        games : pd.DataFrame
+    Returns:
+        None
+    """
+
+    # Prints datatypes
+    print(f" --- DATATYPES --- ")
+    print(f"{games.dtypes}\n")
+
+    # Print number of rows and columns
+    n_rows, n_cols = games.shape
+    print(f" --- SHAPE --- ")
+    print(f"{n_rows} rows, {n_cols} columns \n")
+
+    # Prints number of NaN's by column
+    nan_counts = games.isna().sum()
+    nan_counts = nan_counts[nan_counts > 0].sort_values(ascending=False)
+    print(f" --- NaN's PER COLUMN --- ")
+    if len(nan_counts) == 0:
+        print(f"No NaN's found")
+    else:
+        print(f"{nan_counts[nan_counts > 0].sort_values(ascending=False)}")
+
+    # Print rows     
+    if 'GAME_ID' in games.columns:
+        rows_per_game = games['GAME_ID'].value_counts().unique()
+        teams_per_game = games.groupby('GAME_ID')['UNIQUE_ID'].nunique().unique()
+        print(f"\nUNIQUE ROW COUNTS PER GAME ID: {rows_per_game}")
+        print(f"UNIQUE ID COUNTS PER GAME ID: {teams_per_game}")
 
 
 def generate_kde_plots(df, columns, home_column='IS_HOME', suffix='_for'):
@@ -209,37 +253,54 @@ def generate_kde_plots(df, columns, home_column='IS_HOME', suffix='_for'):
     plt.tight_layout()
     plt.show()
 
-def get_summary_cols_map(cols):
-    map = {}
-    for col in cols:
-        stripped_col = col
-        stripped_col = stripped_col.replace('_ag', '')
-        stripped_col = stripped_col.replace('_for', '')
-        map[col] = (stripped_col + '_mean', stripped_col + '_std')
-    return map
 
-def get_summary_cols_str(summary_cols_map):
-    flattened_values = [col1 + ', ' + col2 for col1, col2 in list(summary_cols_map.values())]
-    flattened_values = list(set(flattened_values))
-    return ', '.join(flattened_values)
+def generate_corr_matrices(games : pd.DataFrame):
+    cols = [col for col in list(games.columns) if col != 'UNIQUE_ID']
+    for_cols = [col for col in cols if '_for' in col]
+    ag_cols = [col for col in cols if '_ag' in col]
+    correlation_matrix = games[cols].corr()
+    
+    # Create a figure with 2 rows and 1 column of subplots
+    fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(8, 12))  # Adjust height with figsize
+
+    # First heatmap: correlation_matrix.loc[for_cols, for_cols]
+    sns.heatmap(
+        correlation_matrix.loc[for_cols, for_cols],
+        annot=True,
+        cmap='coolwarm',
+        center=0,  # Center the colormap at zero
+        vmin=-0.5,   # Set the minimum correlation value
+        vmax=0.5,    # Set the maximum correlation value
+        fmt=".1f",
+        square=True,
+        linewidths=.5,
+        cbar_kws={"shrink": .8},
+        annot_kws={"size": 8},
+        ax=axes[0]  # Plot on the first axis
+    )
+    axes[0].set_title("Heatmap of stats for with other stats for")
+
+    # Second heatmap: correlation_matrix.loc[for_cols, ag_cols]
+    sns.heatmap(
+        correlation_matrix.loc[for_cols, ag_cols],
+        annot=True,
+        cmap='coolwarm',
+        center=0,  # Center the colormap at zero
+        vmin=-0.5,   # Set the minimum correlation value
+        vmax=0.5,    # Set the maximum correlation value
+        fmt=".1f",
+        square=True,
+        linewidths=.5,
+        cbar_kws={"shrink": .8},
+        annot_kws={"size": 8},  # Adjust the size of annotations
+        ax=axes[1]  # Plot on the second axis
+    )
+    axes[1].set_title("Heatmap of stats for with stats ag")
+
+    # Adjust layout for better spacing
+    plt.tight_layout()
+    plt.show()
 
 
-
-
-def normalize(games : pd.DataFrame, summary_stats : pd.DataFrame) -> pd.DataFrame:
+def roll(games : pd.DataFrame, window_size : int=0) -> None:
     pass
-
-def get_rolling(games : pd.DataFrame, window_size : int=0) -> None:
-    return
-    # Step 1: Sort by 'SEASON_ID', 'TEAM_ID_for', and 'GAME_DATE', groupby 'SEASON_ID', 'NEW_TEAM_ID_for'
-    games = games.sort_values(by=['SEASON_ID', 'NEW_TEAM_ID_for', 'GAME_DATE'])
-    team_groups = games.groupby(['SEASON_ID', 'NEW_TEAM_ID_for'])
-    
-    # Step 2: Define numerical columns for which we want the rolling average
-    # First define cols not to roll (all metadata + some other)
-    cols_not_to_roll = list(game_metadata.columns)
-    cols_not_to_roll += [
-        'UNIQUE_ID',
-        'NEW_TEAM_ID_for', 'NEW_TEAM_ID_ag'
-    ]
-    
