@@ -74,7 +74,7 @@ if __name__ == "__main__":
     pass
     mirror(
         game_metadata, 
-        cols_to_mirror=['NEW_TEAM_ID']
+        cols_to_mirror=['NEW_TEAM_ID', 'TEAM_ABBREVIATION']
     ) 
     drop_cols(game_metadata, ['TEAM_ID'])
     
