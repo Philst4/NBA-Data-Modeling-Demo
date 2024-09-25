@@ -97,98 +97,7 @@ def query_db(db_path : str, query : str) -> pd.DataFrame:
     conn.close()
     return dataframe
 
-
-def get_normalized_by_season(
-        game_data : pd.DataFrame,
-        game_metadata : pd.DataFrame
-    ) -> pd.DataFrame:
-    
-    game_data = game_data.copy()
-    game_metadata = game_metadata[["UNIQUE_ID, SEASON_ID"]].copy()
-
-    game_data = pd.merge(game_metadata, game_data, on='UNIQUE_ID')
-
-    # List of columns to normalize (excluding identifiers)
-    cols_to_normalize = [col for col in game_data.columns if col not in ('UNIQUE_ID', 'SEASON_ID')]
-
-# Normalize each column by SEASON_ID
-    game_data[cols_to_normalize] = game_data.groupby('SEASON_ID')[cols_to_normalize].transform(
-        lambda x: (x - x.mean()) / x.std()
-    )
-    return game_data.drop('SEASON_ID', axis=1)  # Return normalized data without the SEASON_ID column
-
-def get_rolling_avgs(
-        game_data : pd.DataFrame,
-        game_metadata : pd.DataFrame,
-        window : int=1,
-        set_na_to_0 : bool=True
-    ) -> pd.DataFrame:
-    
-    game_data = game_data.copy()
-    metadata_cols = [
-        'UNIQUE_ID', 'SEASON_ID', 
-        'NEW_TEAM_ID_for', 'NEW_TEAM_ID_ag',
-        'GAME_DATE'
-    ]
-    game_metadata = game_metadata[metadata_cols].copy()
-    
-    if window <= 0:
-        window = 100
-    
-    # Get window str
-    if window > 82:
-        window_str = "0"
-    else:
-        window_str = str(window)
-
-    # Define cols to roll (all of game_data except 'UNIQUE_ID')
-    cols_to_roll = [col for col in list(game_data.columns) if col != 'UNIQUE_ID']
-
-    # Merge metadata with game_data
-    main_data = pd.merge(game_metadata, game_data, on='UNIQUE_ID')
-    
-    # Define rolling function
-    roll = lambda x: x.shift(1).rolling(window=window, min_periods=1).mean()
-    
-    #### GET ROLLING AVERAGES FOR '_for' TEAM ####
-    # Sort and groupby
-    main_data = main_data.sort_values(by=['SEASON_ID', 'NEW_TEAM_ID_for', 'GAME_DATE'])
-    team_groups = main_data.groupby(['SEASON_ID', 'NEW_TEAM_ID_for'])
-    
-    # Apply roling and calculate mean, exclude current row
-    rolling_avgs = team_groups[cols_to_roll].apply(roll)
-    rolling_avgs = rolling_avgs.set_index(main_data.index).add_suffix('_prev_' + window_str)
-
-    # Add 'UNIQUE_ID' (already sorted to match rolling_avgs)
-    rolling_avgs['UNIQUE_ID'] = main_data['UNIQUE_ID']
-
-    #### GET ROLLING AVERAGES FOR '_ag' TEAM ####
-    # Sort and groupby
-    main_data = main_data.sort_values(by=['SEASON_ID', 'NEW_TEAM_ID_ag', 'GAME_DATE'])
-    team_groups = main_data.groupby(['SEASON_ID', 'NEW_TEAM_ID_ag'])
-    
-    # Apply roling and calculate mean, exclude current row
-    rolling_avgs_opp = team_groups[cols_to_roll].apply(roll)
-    rolling_avgs_opp = rolling_avgs_opp.set_index(main_data.index).add_suffix('_prev_' + window_str)
-
-    # Name opposing properly
-    rolling_avgs_opp = rolling_avgs_opp.rename(columns=rename_for_rolled_opp)
-
-    # Add 'UNIQUE_ID' (already sorted to match rolling_avgs_opp)
-    rolling_avgs_opp['UNIQUE_ID'] = main_data['UNIQUE_ID']
-    
-    # Merge rolling_avgs and rolling_avgs_opp
-    all_rolling_avgs = pd.merge(rolling_avgs, rolling_avgs_opp, on='UNIQUE_ID')
-    
-    # First games of season for each team will have 'NA' rolling averages
-    # Set NA's to 0 if specified
-    if set_na_to_0:
-        # Note: sets ALL NA's to 0, so will mask uncleaned data
-        all_rolling_avgs[all_rolling_avgs.isna()] = 0
-    return all_rolling_avgs
-
-
-#### BASIC INFO GATHERING ####
+#### COMMON INFO GATHERING/CHECKS ####
 
 def check_db(db_path : str) -> None:
     assert(os.path.exists(db_path)), f"Database not found at '{db_path}'"
@@ -274,7 +183,103 @@ def check_df(games : pd.DataFrame, check_game_counts : bool=True) -> None:
         print(f"UNIQUE ID COUNTS PER GAME ID: {teams_per_game}")
 
 
-#### GENERATING PLOTS/VISUALS ####
+#### COMMON DF PROCESSING ####
+def get_normalized_by_season(
+        game_data : pd.DataFrame,
+        game_metadata : pd.DataFrame
+    ) -> pd.DataFrame:
+    
+    game_data = game_data.copy()
+    game_metadata = game_metadata[['UNIQUE_ID', 'SEASON_ID']].copy()
+
+    game_data = pd.merge(game_metadata, game_data, on='UNIQUE_ID')
+
+    # List of columns to normalize (excluding identifiers)
+    cols_to_normalize = [col for col in game_data.columns if col not in ('UNIQUE_ID', 'SEASON_ID')]
+
+# Normalize each column by SEASON_ID
+    game_data[cols_to_normalize] = game_data.groupby('SEASON_ID')[cols_to_normalize].transform(
+        lambda x: (x - x.mean()) / x.std()
+    )
+    return game_data.drop('SEASON_ID', axis=1)  # Return normalized data without the SEASON_ID column
+
+def get_rolling_avgs(
+        game_data : pd.DataFrame,
+        game_metadata : pd.DataFrame,
+        game_data_cols=None,
+        window : int=1,
+        set_na_to_0 : bool=True
+    ) -> pd.DataFrame:
+    
+    if game_data_cols is not None:
+        game_data = game_data[game_data_cols].copy()
+    else:
+        game_data = game_data.copy()
+        
+    metadata_cols = [
+        'UNIQUE_ID', 'SEASON_ID', 
+        'NEW_TEAM_ID_for', 'NEW_TEAM_ID_ag',
+        'GAME_DATE'
+    ]
+    game_metadata = game_metadata[metadata_cols].copy()
+    
+    if window <= 0:
+        window = 100
+    
+    # Get window str
+    if window > 82:
+        window_str = "0"
+    else:
+        window_str = str(window)
+
+    # Define cols to roll (all of game_data except 'UNIQUE_ID')
+    cols_to_roll = [col for col in list(game_data.columns) if col != 'UNIQUE_ID']
+
+    # Merge metadata with game_data
+    main_data = pd.merge(game_metadata, game_data, on='UNIQUE_ID')
+    
+    # Define rolling function
+    roll = lambda x: x.shift(1).rolling(window=window, min_periods=1).mean()
+    
+    #### GET ROLLING AVERAGES FOR '_for' TEAM ####
+    # Sort and groupby
+    main_data = main_data.sort_values(by=['SEASON_ID', 'NEW_TEAM_ID_for', 'GAME_DATE'])
+    team_groups = main_data.groupby(['SEASON_ID', 'NEW_TEAM_ID_for'])
+    
+    # Apply roling and calculate mean, exclude current row
+    rolling_avgs = team_groups[cols_to_roll].apply(roll)
+    rolling_avgs = rolling_avgs.set_index(main_data.index).add_suffix('_prev_' + window_str)
+
+    # Add 'UNIQUE_ID' (already sorted to match rolling_avgs)
+    rolling_avgs['UNIQUE_ID'] = main_data['UNIQUE_ID']
+
+    #### GET ROLLING AVERAGES FOR '_ag' TEAM ####
+    # Sort and groupby
+    main_data = main_data.sort_values(by=['SEASON_ID', 'NEW_TEAM_ID_ag', 'GAME_DATE'])
+    team_groups = main_data.groupby(['SEASON_ID', 'NEW_TEAM_ID_ag'])
+    
+    # Apply roling and calculate mean, exclude current row
+    rolling_avgs_opp = team_groups[cols_to_roll].apply(roll)
+    rolling_avgs_opp = rolling_avgs_opp.set_index(main_data.index).add_suffix('_prev_' + window_str)
+
+    # Name opposing properly
+    rolling_avgs_opp = rolling_avgs_opp.rename(columns=rename_for_rolled_opp)
+
+    # Add 'UNIQUE_ID' (already sorted to match rolling_avgs_opp)
+    rolling_avgs_opp['UNIQUE_ID'] = main_data['UNIQUE_ID']
+    
+    # Merge rolling_avgs and rolling_avgs_opp
+    all_rolling_avgs = pd.merge(rolling_avgs, rolling_avgs_opp, on='UNIQUE_ID')
+    
+    # First games of season for each team will have 'NA' rolling averages
+    # Set NA's to 0 if specified
+    if set_na_to_0:
+        # Note: sets ALL NA's to 0, so will mask uncleaned data
+        all_rolling_avgs[all_rolling_avgs.isna()] = 0
+    return all_rolling_avgs
+
+
+#### COMMON PLOT/VISUAL GENERATING ####
 
 def generate_kde_plots(df, columns, suffix='_for'):
     """
