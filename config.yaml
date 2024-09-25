@@ -87,10 +87,10 @@ setups:
           - ['SEASON_ID', null, 'metadata']
           - ['GAME_DATE', null, 'metadata']
           - ['MATCHUP', null, 'metadata']
-      - table_name: 'game_data'
-        channel:
           - ['NEW_TEAM_ID_for', 'ohe', 'kq']
           - ['NEW_TEAM_ID_ag', 'ohe', 'kq']
+      - table_name: 'game_data'
+        channel:
           - ['PLUS_MINUS_for', 'normalize', 'v']
           - ['PLUS_MINUS_for', 'normalize', 'targets']
       train_seasons: [22000, 22022]

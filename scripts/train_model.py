@@ -108,7 +108,7 @@ if __name__ == '__main__':
     trainer = Trainer(max_epochs=epochs) #, logger=logger)
     
     # TRAINING
-    print("Training for 5 epochs")
+    print(f"Training for {epochs} epochs")
     trainer.fit(
         lightning_model, 
         train_loader,
