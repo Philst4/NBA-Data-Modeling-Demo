@@ -16,7 +16,7 @@ from torch.optim import (
     Adam
 )
 from lightning import Trainer
-#from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.loggers import CSVLogger
 
 # Local imports
 from src.dataloading import (
@@ -102,10 +102,10 @@ if __name__ == '__main__':
     model_save_path = os.path.join(MODEL_SAVE_DIR, model_save_name)
     
     # Initialize logger
-    #logger = TensorBoardLogger("logs/", name="base_model")
+    logger = CSVLogger("logs/", name="base_model")
     
     # Initialize trainer
-    trainer = Trainer(max_epochs=epochs) #, logger=logger)
+    trainer = Trainer(max_epochs=epochs, logger=logger)
     
     # TRAINING
     print(f"Training for {epochs} epochs")

@@ -438,3 +438,26 @@ def plot_corrs_for_windows(window_sizes, results):
     plt.grid(True)
     plt.legend(title="Stats")
     plt.show()
+    
+    
+    
+#### CHECKING LOGS
+
+def get_model_csv_log(log_path):
+    log = pd.read_csv(log_path)
+    # Cleaning up dataframe
+    # Fill NaN values in train columns with corresponding validation rows and vice versa
+    log = log.groupby('epoch', as_index=False).apply(lambda x: x.ffill().bfill())
+
+    # Drop duplicate rows (they might exist after filling)
+    log = log.drop_duplicates(subset='epoch')
+
+    # Drop 'step' column
+    log.drop(['step'], axis=1, inplace=True)
+
+    # Reset the index after cleaning
+    log = log.reset_index(drop=True)
+    
+    cols = ['epoch', 'train_loss', 'val_loss', 'train_acc', 'val_acc']
+    log = log[cols]
+    return log

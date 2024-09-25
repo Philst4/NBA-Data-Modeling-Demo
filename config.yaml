@@ -108,7 +108,7 @@ setups:
     # Training
     training_config: 
       lr: 0.5
-      epochs: 100
+      epochs: 5
   # specify epochs in CL argument
   B:
     # Data pipeline configuration
