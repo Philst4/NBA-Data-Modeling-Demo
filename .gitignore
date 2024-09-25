@@ -11,11 +11,11 @@ __pycache__/
 .new_venv/
 
 # Data
-data/
+/data/
 # Logs
-lightning_logs/
+/lightning_logs/
 # Serialized Models
-models/
+/models/
 
 # Other to ignore (for now)
 #Tests

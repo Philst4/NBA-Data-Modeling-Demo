@@ -207,7 +207,7 @@ def get_rolling_avgs(
         game_data : pd.DataFrame,
         game_metadata : pd.DataFrame,
         game_data_cols=None,
-        window : int=1,
+        windows : list=[1],
         need_opp : bool=True,
         set_na_to_0 : bool=True
     ) -> pd.DataFrame:
@@ -223,65 +223,74 @@ def get_rolling_avgs(
         'GAME_DATE'
     ]
     game_metadata = game_metadata[metadata_cols].copy()
-    
-    if window <= 0:
-        window = 100
-    
-    # Get window str
-    if window > 82:
-        window_str = "0"
-    else:
-        window_str = str(window)
 
     # Define cols to roll (all of game_data except 'UNIQUE_ID')
     cols_to_roll = [col for col in list(game_data.columns) if col != 'UNIQUE_ID']
 
     # Merge metadata with game_data
     game_data = pd.merge(game_metadata, game_data, on='UNIQUE_ID')
-    
-    # Define rolling function
-    roll = lambda x: x.shift(1).rolling(window=window, min_periods=1).mean()
-    
-    #### GET ROLLING AVERAGES FOR '_for' TEAM ####
-    # Sort and groupby
-    game_data = game_data.sort_values(by=['SEASON_ID', 'NEW_TEAM_ID_for', 'GAME_DATE'])
-    team_groups = game_data.groupby(['SEASON_ID', 'NEW_TEAM_ID_for'])
-    
-    # Apply roling and calculate mean, exclude current row
-    rolling_avgs = team_groups[cols_to_roll].apply(roll)
-    rolling_avgs = rolling_avgs.set_index(game_data.index).add_suffix('_prev_' + window_str)
 
-    # Add 'UNIQUE_ID' (already sorted to match rolling_avgs)
-    rolling_avgs['UNIQUE_ID'] = game_data['UNIQUE_ID']
+    all_rolling_avgs = []
 
-    #### GET ROLLING AVERAGES FOR '_ag' TEAM ####
-    if need_opp:
+    for window in windows:
+        if window <= 0:
+            window = 100
+
+        # Get window str
+        if window > 82:
+            window_str = "0"
+        else:
+            window_str = str(window)
+
+        # Define rolling function
+        roll = lambda x: x.shift(1).rolling(window=window, min_periods=1).mean()
+
+        #### GET ROLLING AVERAGES FOR '_for' TEAM ####
         # Sort and groupby
-        game_data = game_data.sort_values(by=['SEASON_ID', 'NEW_TEAM_ID_ag', 'GAME_DATE'])
-        team_groups = game_data.groupby(['SEASON_ID', 'NEW_TEAM_ID_ag'])
-        
-        # Apply roling and calculate mean, exclude current row
-        rolling_avgs_opp = team_groups[cols_to_roll].apply(roll)
-        rolling_avgs_opp = rolling_avgs_opp.set_index(game_data.index).add_suffix('_prev_' + window_str)
+        game_data = game_data.sort_values(by=['SEASON_ID', 'NEW_TEAM_ID_for', 'GAME_DATE'])
+        team_groups = game_data.groupby(['SEASON_ID', 'NEW_TEAM_ID_for'])
 
-        # Name opposing properly
-        rolling_avgs_opp = rolling_avgs_opp.rename(columns=rename_for_rolled_opp)
+        # Apply rolling and calculate mean, exclude current row
+        rolling_avgs = team_groups[cols_to_roll].apply(roll)
+        rolling_avgs = rolling_avgs.set_index(game_data.index).add_suffix('_prev_' + window_str)
 
-        # Add 'UNIQUE_ID' (already sorted to match rolling_avgs_opp)
-        rolling_avgs_opp['UNIQUE_ID'] = game_data['UNIQUE_ID']
-        
-        # Merge rolling_avgs and rolling_avgs_opp
-        all_rolling_avgs = pd.merge(rolling_avgs, rolling_avgs_opp, on='UNIQUE_ID')
-        
-        # First games of season for each team will have 'NA' rolling averages
-        # Set NA's to 0 if specified
-    else:
-        all_rolling_avgs = rolling_avgs
+        # Add 'UNIQUE_ID' (already sorted to match rolling_avgs)
+        rolling_avgs['UNIQUE_ID'] = game_data['UNIQUE_ID']
+
+        #### GET ROLLING AVERAGES FOR '_ag' TEAM ####
+        if need_opp:
+            # Sort and groupby
+            game_data = game_data.sort_values(by=['SEASON_ID', 'NEW_TEAM_ID_ag', 'GAME_DATE'])
+            team_groups = game_data.groupby(['SEASON_ID', 'NEW_TEAM_ID_ag'])
+
+            # Apply rolling and calculate mean, exclude current row
+            rolling_avgs_opp = team_groups[cols_to_roll].apply(roll)
+            rolling_avgs_opp = rolling_avgs_opp.set_index(game_data.index).add_suffix('_prev_' + window_str)
+
+            # Name opposing properly
+            rolling_avgs_opp = rolling_avgs_opp.rename(columns=rename_for_rolled_opp)
+
+            # Add 'UNIQUE_ID' (already sorted to match rolling_avgs_opp)
+            rolling_avgs_opp['UNIQUE_ID'] = game_data['UNIQUE_ID']
+
+            # Merge rolling_avgs and rolling_avgs_opp
+            rolling_avg_combined = pd.merge(rolling_avgs, rolling_avgs_opp, on='UNIQUE_ID')
+        else:
+            rolling_avg_combined = rolling_avgs
+
+        all_rolling_avgs.append(rolling_avg_combined)
+
+    # Concatenate all rolling averages for different windows
+    final_rolling_avgs = pd.concat(all_rolling_avgs, axis=1)
+
+    # Drop duplicate 'UNIQUE_ID' columns created in merging
+    final_rolling_avgs = final_rolling_avgs.loc[:, ~final_rolling_avgs.columns.duplicated()]
+
     if set_na_to_0:
         # Note: sets ALL NA's to 0, so will mask uncleaned data
-        all_rolling_avgs[all_rolling_avgs.isna()] = 0
-    return all_rolling_avgs
+        final_rolling_avgs[final_rolling_avgs.isna()] = 0
 
+    return final_rolling_avgs
 
 
 #### COMMON PLOT/VISUAL GENERATING ####
@@ -395,23 +404,28 @@ def calculate_corrs_for_windows(game_data, game_metadata, stats_to_analyze, max_
     results = {}
     window_sizes = [2 ** i for i in range(max_exp + 1)] + [82]
     
+    # Get rolling averages for all stats and all window sizes
+    rolling_avgs = get_rolling_avgs(game_data, game_metadata, game_data_cols=stats_to_analyze, windows=window_sizes, need_opp=False)
+
     for stat in stats_to_analyze:
         correlations = []
         for window in window_sizes:
-            # Get rolling averages for the current stat and window
-            rolling_avgs = get_rolling_avgs(game_data, game_metadata, game_data_cols=[stat], need_opp=False, window=window)
+            # Use the rolling averages corresponding to the current window size
+            rolling_stat_col = f"{stat}_prev_{window}"
             
-            # Calculate correlation between stat and PLUS_MINUS_for
-            temp = pd.merge(game_data, rolling_avgs, on='UNIQUE_ID')
-            correlation = temp[stat + '_prev_' + str(window)].corr(temp['PLUS_MINUS_for'])
+            # Merge the rolling averages with the original game data
+            temp = pd.merge(game_data, rolling_avgs[['UNIQUE_ID', rolling_stat_col]], on='UNIQUE_ID')
+            
+            # Calculate correlation between the rolling average and PLUS_MINUS_for
+            correlation = temp[rolling_stat_col].corr(temp['PLUS_MINUS_for'])
             correlations.append(correlation)
         
-        results[stat + '_prev_k'] = correlations
+        results[f'{stat}_prev_k'] = correlations
     
     return window_sizes, results
 
 # Plot the results for multiple stats
-def plot_corrs_multiple_stats(window_sizes, results):
+def plot_corrs_for_windows(window_sizes, results):
     plt.figure(figsize=(10, 6))
     
     for stat, correlations in results.items():
