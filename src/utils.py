@@ -98,39 +98,39 @@ def query_db(db_path : str, query : str) -> pd.DataFrame:
     return dataframe
 
 
-def get_normalized_table(
-        db_path : str,
-        table_name : str
+def get_normalized_by_season(
+        game_data : pd.DataFrame,
+        game_metadata : pd.DataFrame
     ) -> pd.DataFrame:
     
-    # Query for main table
-    main_data = query_db(
-        db_path=db_path,
-        query=f"SELECT * FROM {table_name}"
-    )
-    
-    # Query for Season ID's, merge with main data
-    season_ids = query_db(
-        db_path=db_path,
-        query=f"SELECT UNIQUE_ID, SEASON_ID FROM game_metadata"
-    )
-    main_data = pd.merge(main_data, season_ids, on='UNIQUE_ID')
+    game_data = game_data.copy()
+    game_metadata = game_metadata[["UNIQUE_ID, SEASON_ID"]].copy()
+
+    game_data = pd.merge(game_metadata, game_data, on='UNIQUE_ID')
 
     # List of columns to normalize (excluding identifiers)
-    cols_to_normalize = [col for col in main_data.columns if col not in ('UNIQUE_ID', 'SEASON_ID')]
+    cols_to_normalize = [col for col in game_data.columns if col not in ('UNIQUE_ID', 'SEASON_ID')]
 
 # Normalize each column by SEASON_ID
-    main_data[cols_to_normalize] = main_data.groupby('SEASON_ID')[cols_to_normalize].transform(
+    game_data[cols_to_normalize] = game_data.groupby('SEASON_ID')[cols_to_normalize].transform(
         lambda x: (x - x.mean()) / x.std()
     )
-    return main_data.drop('SEASON_ID', axis=1)  # Return normalized data without the SEASON_ID column
+    return game_data.drop('SEASON_ID', axis=1)  # Return normalized data without the SEASON_ID column
 
 def get_rolling_avgs(
-        db_path : str,
-        table_name : str,
+        game_data : pd.DataFrame,
+        game_metadata : pd.DataFrame,
         window : int=1,
         set_na_to_0 : bool=True
     ) -> pd.DataFrame:
+    
+    game_data = game_data.copy()
+    metadata_cols = [
+        'UNIQUE_ID', 'SEASON_ID', 
+        'NEW_TEAM_ID_for', 'NEW_TEAM_ID_ag',
+        'GAME_DATE'
+    ]
+    game_metadata = game_metadata[metadata_cols].copy()
     
     if window <= 0:
         window = 100
@@ -141,25 +141,11 @@ def get_rolling_avgs(
     else:
         window_str = str(window)
 
-    # Read in necessary data
-    # Query for main table
-    main_data = query_db(
-        db_path=db_path,
-        query=f"SELECT * FROM {table_name}"
-    )
+    # Define cols to roll (all of game_data except 'UNIQUE_ID')
+    cols_to_roll = [col for col in list(game_data.columns) if col != 'UNIQUE_ID']
 
-    # Query for necessary metadata
-    cols_to_select = "UNIQUE_ID, SEASON_ID, NEW_TEAM_ID_for, NEW_TEAM_ID_ag, GAME_DATE"
-    metadata = query_db(
-        db_path=db_path,
-        query=f"SELECT {cols_to_select} FROM game_metadata"
-    )
-
-    # Define cols to roll (all of main_data except 'UNIQUE_ID')
-    cols_to_roll = [col for col in list(main_data.columns) if col != 'UNIQUE_ID']
-
-    # Merge metadata with main_data
-    main_data = pd.merge(metadata, main_data, on='UNIQUE_ID')
+    # Merge metadata with game_data
+    main_data = pd.merge(game_metadata, game_data, on='UNIQUE_ID')
     
     # Define rolling function
     roll = lambda x: x.shift(1).rolling(window=window, min_periods=1).mean()
