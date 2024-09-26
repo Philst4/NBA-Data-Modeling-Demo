@@ -443,21 +443,29 @@ def plot_corrs_for_windows(window_sizes, results):
     
 #### CHECKING LOGS
 
-def get_model_csv_log(log_path):
-    log = pd.read_csv(log_path)
+def check_training_logs(logs_path):
+    logs = pd.read_csv(logs_path)
     # Cleaning up dataframe
     # Fill NaN values in train columns with corresponding validation rows and vice versa
-    log = log.groupby('epoch', as_index=False).apply(lambda x: x.ffill().bfill())
+    logs = logs.groupby('epoch', as_index=False).apply(lambda x: x.ffill().bfill())
 
     # Drop duplicate rows (they might exist after filling)
-    log = log.drop_duplicates(subset='epoch')
+    logs = logs.drop_duplicates(subset='epoch')
 
     # Drop 'step' column
-    log.drop(['step'], axis=1, inplace=True)
+    logs.drop(['step'], axis=1, inplace=True)
 
     # Reset the index after cleaning
-    log = log.reset_index(drop=True)
+    logs = logs.reset_index(drop=True)
     
     cols = ['epoch', 'train_loss', 'val_loss', 'train_acc', 'val_acc']
-    log = log[cols]
-    return log
+    logs = logs[cols]
+    return logs
+
+def save_from_ckpt():
+    pass
+
+
+#### USING FOR PREDICTION ####
+def predict():
+    pass

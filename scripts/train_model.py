@@ -1,6 +1,7 @@
 import sys
 import os
 import importlib
+import argparse
 
 # Add the project root to the Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -30,6 +31,12 @@ from src.training import (
 )
 
 if __name__ == '__main__':
+    # Command line arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--epochs', required=True, type=int, help="Number of epochs to train model")
+    args = parser.parse_args()
+    epochs = args.epochs
+    
     # Read in configuration
     with open('config.yaml', 'r') as file:
         config = yaml.safe_load(file)
@@ -88,7 +95,7 @@ if __name__ == '__main__':
     loss_fn_class = MSELoss
     optimizer_class = Adam
     lr = training_config['lr']
-    epochs = training_config['epochs']
+    #epochs = training_config['epochs']
     
     # Initialize LightningModule
     lightning_model = LightningModel(
