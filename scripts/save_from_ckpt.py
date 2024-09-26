@@ -17,7 +17,7 @@ from src.training import (
 
 if __name__ == "__main__":    
     # Read in configuration
-    with open('config.yaml', 'r') as file:
+    with open('configs/old_config.yaml', 'r') as file:
         config = yaml.safe_load(file)
     MODEL_SRC_DIR = config['model_src_dir']
     sys.path.append(MODEL_SRC_DIR)

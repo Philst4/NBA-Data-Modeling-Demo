@@ -1,12 +1,12 @@
-# Paths
+# Directories
 raw_dir: './data/raw' 
 clean_dir: './data/clean'
-db_name: 'my_database.db'
 model_src_dir: './src/models'
 model_save_dir: './models'
 
-# File names
+# File names (to be updated)
 raw_file_name: 'raw.csv'
+db_name: 'my_database.db'
 
 # Raw data
 ingest_data:

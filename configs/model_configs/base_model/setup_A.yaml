@@ -1,0 +1,35 @@
+
+# Data pipeline configuration
+dataloading_config: 
+  ssd_blueprint:
+  - channel: 'metadata'
+    sources:
+    - ['game_metadata', 'SEASON_ID', null]
+    - ['game_metadata', 'GAME_DATE', null]
+    - ['game_metadata', 'MATCHUP', null]
+  - channel: 'kq'
+    sources:
+    - ['game_metadata', 'NEW_TEAM_ID_for', 'ohe']
+    - ['game_metadata', 'NEW_TEAM_ID_ag', 'ohe']
+  - channel: 'v'
+    sources: 
+    - ['game_data', 'PLUS_MINUS_for', 'normalize']
+  - channel: 'targets'
+    - ['game_data', 'PLUS_MINUS_for', 'normalize']
+  train_seasons: [22000, 22022]
+  val_seasons: [22023, 22023]
+  batch_size: 5
+
+# Model architecture
+model_config: 
+  name: 'base_model'
+  hyperparams:
+    input_dim_v: 1
+    embed_dim_v: 4
+    n_heads: 4
+    dropout: 0.1
+    output_dim: 1
+
+# Training
+training_config: 
+  lr: 0.5

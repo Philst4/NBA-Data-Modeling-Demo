@@ -23,7 +23,7 @@ import random
 
 if __name__ == "__main__":
     # Read in configuration
-    with open('config.yaml', 'r') as file:
+    with open('configs/old_config.yaml', 'r') as file:
         config = yaml.safe_load(file)
     CLEAN_DIR = config['clean_dir']
     DB_NAME = config['db_name']
