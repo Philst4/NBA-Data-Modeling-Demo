@@ -1,6 +1,7 @@
 import sys
 import os
 import importlib
+import argparse
 
 # Add the project root to the Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -16,6 +17,29 @@ from src.training import (
 )
 
 if __name__ == "__main__":    
+    # Command line arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model", required=True, type=str, help="Name of trained model architecture")
+    parser.add_argument("--version", required=True, type=int, help="Name of version")
+    args = parser.parse_args()
+    model_name = args.model
+    version = args.version
+    
+    # To extract from yaml config (to revisit)
+    ckpts_dir = "logs"
+    model_save_dir = "models"
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     # Read in configuration
     with open('configs/old_config.yaml', 'r') as file:
         config = yaml.safe_load(file)

@@ -440,10 +440,12 @@ def plot_corrs_for_windows(window_sizes, results):
     plt.show()
     
     
-    
 #### CHECKING LOGS
 
-def check_training_logs(logs_path):
+def get_training_logs(logs_dir, model_name, version):
+    version_name = "version_" + str(version)
+    
+    logs_path = os.path.join(logs_dir, model_name, version_name, "metrics.csv")
     logs = pd.read_csv(logs_path)
     # Cleaning up dataframe
     # Fill NaN values in train columns with corresponding validation rows and vice versa
