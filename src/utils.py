@@ -12,6 +12,8 @@ import numpy as np
 import sqlite3
 import matplotlib.pyplot as plt
 import seaborn as sns
+import torch
+from torch import nn
 
 #### STRING PROCESSING UTILITIES ####
 
