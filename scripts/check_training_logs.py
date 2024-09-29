@@ -9,6 +9,7 @@ sys.path.append(project_root)
 # External imports
 import yaml
 import pandas as pd
+import matplotlib.pyplot as plt
 
 # Internal imports
 from src.utils import (
@@ -33,5 +34,18 @@ if __name__ == "__main__":
     print(f"\n Training logs for '{model_name}', 'version_{version}':")
     print(f"{training_logs}")
     
+    """
+    fig, axes = plt.subplots(2, 2, figsize=(10, 8))
     
+    training_logs['train_loss'].plot(ax=axes[0, 0], title='train_loss', color='y')
+    training_logs['val_loss'].plot(ax=axes[0,1], title='test_loss', color='g')
+    training_logs['train_acc'].plot(ax=axes[1, 0], title='train_acc', color='b')
+    training_logs['val_acc'].plot(ax=axes[1, 1], title='test_acc', color='m')
+    
+    # Add layout adjustments
+    plt.tight_layout()
+
+    # Show plot
+    plt.show()
+    """
     

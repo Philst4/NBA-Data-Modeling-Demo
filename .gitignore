@@ -14,8 +14,6 @@ __pycache__/
 /data/
 # Logs
 /*logs
-# Serialized Models
-/models/
 
 # Other to ignore (for now)
 #Tests
