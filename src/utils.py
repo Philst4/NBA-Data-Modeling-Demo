@@ -8,6 +8,7 @@ sys.path.append(project_root)
 # External imports
 import yaml
 import pandas as pd
+import numpy as np
 import sqlite3
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -295,17 +296,34 @@ def get_rolling_avgs(
 
 #### COMMON PLOT/VISUAL GENERATING ####
 
-def generate_kde_plots(df, columns, suffix='_for'):
+def get_summary_stats(values):
     """
-    Generates KDE plots for the specified columns from the dataframe.
+    Helper function to calculate statistics for a given set of values.
+
+    Parameters:
+    values (pd.Series or np.array): The data to calculate statistics for.
+
+    Returns:
+    dict: A dictionary containing the mean, median, standard deviation, min, and max of the values.
+    """
+    return {
+        'mean': np.mean(values),
+        'median': np.median(values),
+        'std': np.std(values),
+        'min': np.min(values),
+        'max': np.max(values)
+    }
+
+def generate_kde_plots(df, columns, suffix='_for', include_stats=False):
+    """
+    Generates KDE plots for the specified columns from the dataframe, 
+    with optional statistics (mean, median, std, min, max) for each plot.
 
     Parameters:
     df (pd.DataFrame): The dataframe containing the data.
     columns (list of str): List of column names to generate plots for.
-    home_column (str): The column name indicating home/away games.
     suffix (str): Suffix for column names indicating 'for' values (e.g., 'PTS_for').
-    nrows (int): Number of rows for the subplot grid.
-    ncols (int): Number of columns for the subplot grid.
+    include_stats (bool): If True, calculate and display stats on the plots.
 
     Returns:
     None
@@ -346,9 +364,59 @@ def generate_kde_plots(df, columns, suffix='_for'):
         ax2.set_ylim(0, 0.08)
         ax2.grid()
 
+        # If include_stats is True, calculate and display stats on the plots
+        if include_stats:
+            home_stats = get_summary_stats(home_values)
+            away_stats = get_summary_stats(away_values)
+            combined_stats = get_summary_stats(values)
+
+            # Annotate stats for home and away on the first plot
+            home_text = '\n'.join([f'home {key}: {val:.2f}' for key, val in home_stats.items()])
+            away_text = '\n'.join([f'away {key}: {val:.2f}' for key, val in away_stats.items()])
+            ax1.text(0.975, 0.8, home_text, transform=ax1.transAxes, fontsize=10, verticalalignment='top', horizontalalignment='right')
+            ax1.text(0.025, 0.8, away_text, transform=ax1.transAxes, fontsize=10, verticalalignment='top', horizontalalignment='left')
+
+            # Annotate stats for combined data on the second plot
+            combined_text = '\n'.join([f'all {key}: {val:.2f}' for key, val in combined_stats.items()])
+            ax2.text(0.975, 0.8, combined_text, transform=ax2.transAxes, fontsize=10, verticalalignment='top', horizontalalignment='right')
+
     # Adjust layout
     plt.tight_layout()
     plt.show()
+
+
+def generate_hist_plot(
+        game_data : pd.DataFrame, 
+        stat : str, 
+        suffix : str='_for', 
+        bin_width : int=1,
+        color='orange',
+        include_stats=False
+    ):
+    # Create bins based on the bin width
+    col = stat + suffix
+    
+    values = game_data[col]
+
+    bins = range(int(values.min()), int(values.max()) + bin_width, bin_width)
+
+    plt.figure(figsize=(12, 6))
+    sns.histplot(values, bins=bins, kde=False, color=color, edgecolor='black', alpha=0.3)
+    plt.xlabel(f"{stat}")
+    plt.ylabel('Frequency')
+    plt.title(f"Histogram of {stat}")
+    plt.grid(axis='y')
+
+    if include_stats:
+        stats = get_summary_stats(values)
+
+        # Annotate stats for home and away on the first plot
+        text = '\n'.join([f'{key}: {val:.2f}' for key, val in stats.items()])
+        plt.text(0.95, 0.95, text, fontsize=10, transform=plt.gca().transAxes, verticalalignment='top', horizontalalignment='right')
+            
+
+    plt.show()
+
 
 
 def generate_corr_matrices(games : pd.DataFrame):
@@ -439,6 +507,175 @@ def plot_corrs_for_windows(window_sizes, results):
     plt.legend(title="Stats")
     plt.show()
     
+    
+def visualize_regression_performance(targets : np.ndarray, preds : np.ndarray):
+
+    mae_per_instance = (targets - preds)
+    mse_per_instance = mae_per_instance ** 2
+
+    # Plot histogram of MSE
+    # Create a 3x2 grid of plots
+    fig, axs = plt.subplots(3, 2, figsize=(10, 15))
+
+    fig.suptitle('Visualization of Regression Performance', fontsize=16)
+
+    # Next
+    axs[0,0].hist(preds, bins=20, color='green', edgecolor='black', alpha=0.7)
+    axs[0,0].set_title('Histogram of preds')
+    axs[0,0].set_xlabel('preds')
+    axs[0,0].set_ylabel('Frequency')
+    axs[0,0].grid(axis='y', alpha=0.75)
+
+
+    axs[0,1].hist(targets, bins=20, color='yellow', edgecolor='black', alpha=0.7)
+    axs[0,1].set_title('Histogram of targets')
+    axs[0,1].set_xlabel('targets')
+    axs[0,1].set_ylabel('Frequency')
+    axs[0,1].grid(axis='y', alpha=0.75)
+
+
+    axs[1,0].hist(mae_per_instance, bins=20, color='skyblue', edgecolor='black', alpha=0.7)
+    axs[1,0].set_title('Histogram of MAE per Instance')
+    axs[1,0].set_xlabel('MAE')
+    axs[1,0].set_ylabel('Frequency')
+    axs[1,0].grid(axis='y', alpha=0.75)
+
+    # Next
+    axs[1,1].hist(mse_per_instance, bins=20, color='orange', edgecolor='black', alpha=0.7)
+    axs[1,1].set_title('Histogram of MSE per Instance')
+    axs[1,1].set_xlabel('MSE')
+    axs[1,1].set_ylabel('Frequency')
+    axs[1,1].grid(axis='y', alpha=0.75)
+
+    correct = np.sign(preds) == np.sign(targets)
+
+    axs[2,0].scatter(targets[correct], preds[correct], sizes=[1], color='skyblue', label='Correct predictions')
+    axs[2,0].scatter(targets[~correct], preds[~correct], sizes=[1], color='orange', label='Incorrect predictions')
+    axs[2,0].plot([targets.min(), targets.max()], [targets.min(), targets.max()], color='red', linestyle='--', label='y = y_pred')  # Reference line
+    axs[2,0].set_title('Targets vs Predicted Values')
+    axs[2,0].set_xlabel('Targets')
+    axs[2,0].set_ylabel('Preds')
+    axs[2,0].axhline(0, color='black', linewidth=1, linestyle='-')
+    axs[2,0].axvline(0, color='black', linewidth=1, linestyle='-')
+    axs[2,0].legend()
+    axs[2,0].grid()
+    axs[2,0].axis('equal')  # Equal scaling for better visualization
+
+    axs[2,1].scatter(targets[correct], mse_per_instance[correct], color='skyblue', sizes=[1])
+    axs[2,1].scatter(targets[~correct], mse_per_instance[~correct], color='orange', sizes=[1])
+    axs[2,1].set_title('Targets vs MSE')
+    axs[2,1].set_xlabel('Targets')
+    axs[2,1].set_ylabel('Mean Squared Error (MSE)')
+    axs[2,1].axvline(0, color='black', linewidth=1, linestyle='-')
+    axs[2,1].axhline(0, color='black', linewidth=1, linestyle='-')
+    axs[2,1].grid()
+
+
+    plt.show()
+
+def plot_training_metrics(metrics : tuple[list[float]]):
+    mses_tr, mses_val, accs_tr, accs_val = metrics
+    
+    best_val_idx = np.argmin(mses_val)
+    
+    fig, axes = plt.subplots(2, 2, figsize=(10, 8))
+
+    fig.suptitle('TRAINING METRICS', fontsize=16)
+
+    y_axis_mse = np.arange(.8, 1.3, .05)
+    y_axis_acc = np.arange(.5, .7, .01)
+
+    axes[0, 0].plot(mses_tr, color='y')
+    axes[0, 0].set_title('train_loss')
+    axes[0, 0].set_title('MSE TR vs EPOCH')
+    axes[0, 0].set_xlabel('epoch')
+    axes[0, 0].set_ylabel('mse_tr')
+    axes[0, 0].set_yticks(y_axis_mse)
+    axes[0, 0].grid(True)
+    axes[0, 0].plot(best_val_idx, mses_tr[best_val_idx], 'rx', markersize=8)
+    axes[0, 0].axhline(mses_tr[best_val_idx], color='r', linestyle='--')
+    axes[0, 0].axvline(best_val_idx, color='r', linestyle='--')
+
+    axes[0, 1].plot(mses_val, color='g')
+    axes[0, 1].set_title('val_loss')
+    axes[0, 1].set_title('MSE VAL vs DEPTH')
+    axes[0, 1].set_xlabel('epoch')
+    axes[0, 1].set_ylabel('mse_val')
+    axes[0, 1].set_yticks(y_axis_mse)
+    axes[0, 1].grid(True)
+    axes[0, 1].plot(best_val_idx, mses_val[best_val_idx], 'rx', markersize=8)
+    axes[0, 1].axhline(mses_val[best_val_idx], color='r', linestyle='--')
+    axes[0, 1].axvline(best_val_idx, color='r', linestyle='--')
+
+    axes[1, 0].plot(accs_tr, color='b')
+    axes[1, 0].set_title('train_acc')
+    axes[1, 0].set_title('ACC TR vs DEPTH')
+    axes[1, 0].set_xlabel('epoch')
+    axes[1, 0].set_ylabel('acc_tr')
+    axes[1, 0].set_yticks(y_axis_acc)
+    axes[1, 0].grid(True)
+    axes[1, 0].plot(best_val_idx, accs_tr[best_val_idx], 'rx', markersize=8)
+    axes[1, 0].axhline(accs_tr[best_val_idx], color='r', linestyle='--')
+    axes[1, 0].axvline(best_val_idx, color='r', linestyle='--')
+
+    axes[1, 1].plot(accs_val, color='m')
+    axes[1, 1].set_title('val_loss')
+    axes[1, 1].set_title('ACC VAL vs DEPTH')
+    axes[1, 1].set_xlabel('epoch')
+    axes[1, 1].set_ylabel('acc_val')
+    axes[1, 1].set_yticks(y_axis_acc)
+    axes[1, 1].grid(True)
+    axes[1, 1].plot(best_val_idx, accs_val[best_val_idx], 'rx', markersize=8)
+    axes[1, 1].axhline(accs_val[best_val_idx], color='r', linestyle='--')
+    axes[1, 1].axvline(best_val_idx, color='r', linestyle='--')
+
+    # Add layout adjustments
+    plt.tight_layout()
+
+    # Show plot
+    plt.show()
+
+def plot_heat_map(model : nn.Module, dataloader : DataLoader, n_games : int=51, vmax : int=0.25):
+    data_iter = iter(dataloader)
+    
+    # Get attention maps
+    with torch.no_grad():
+        kq, v, targets, padding_masks = next(data_iter)
+        kq = kq.to(device)
+        v = v.to(device)
+        targets = targets.to(device)
+        padding_masks = padding_masks.to(device)
+        _, attn_maps = model(kq, v)
+
+    attn_maps = attn_maps[0]
+
+    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+
+    fig.suptitle("Attention Maps of Model Heads")
+
+    sns.heatmap(attn_maps[0, :n_games, :n_games].cpu(), ax=axes[0, 0], cmap='plasma', cbar=True, vmin=0, vmax=0.1)
+    axes[0, 0].set_title("Attention Head 1")
+    axes[0, 0].set_xlabel("Game attended to")
+    axes[0, 0].set_ylabel("Game attending")
+    sns.heatmap(attn_maps[1, :n_games, :n_games].cpu(), ax=axes[0, 1], cmap='plasma', cbar=True, vmin=0, vmax=0.1)
+    axes[0, 1].set_title("Attention Head 2")
+    axes[0, 1].set_xlabel("Game attended to")
+    axes[0, 1].set_ylabel("Game attending")
+    sns.heatmap(attn_maps[2, :n_games, :n_games].cpu(), ax=axes[1, 0], cmap='plasma', cbar=True, vmin=0, vmax=0.1)
+    axes[1, 0].set_title("Attention Head 3")
+    axes[1, 0].set_xlabel("Game attended to")
+    axes[1, 0].set_ylabel("Game attending")
+    sns.heatmap(attn_maps[3, :n_games, :n_games].cpu(), ax=axes[1, 1], cmap='plasma', cbar=True, vmin=0, vmax=0.1)
+    axes[1, 1].set_title("Attention Head 4")
+    axes[1, 1].set_xlabel("Game attended to")
+    axes[1, 1].set_ylabel("Game attending")
+        
+    # Add layout adjustments
+    plt.tight_layout()
+
+    # Show plot
+    plt.show()
+
     
 #### CHECKING LOGS
 
