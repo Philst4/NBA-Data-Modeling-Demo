@@ -575,8 +575,6 @@ def visualize_regression_performance(targets : np.ndarray, preds : np.ndarray):
 
     plt.show()
 
-
-
 def plot_training_metrics(metrics : tuple[list[float]]):
     mses_tr, mses_val, accs_tr, accs_val = metrics
     
@@ -649,7 +647,7 @@ def plot_training_metrics(metrics : tuple[list[float]]):
                     label=f"Best val epoch : acc_val = {accs_val[best_mse_val_idx]:.3f}")
     axes[1, 1].axhline(accs_val[best_mse_val_idx], color='r', linestyle='--')
     axes[1, 1].axvline(best_mse_val_idx, color='r', linestyle='--')
-    axes[1, 1].plot(best_acc_val_idx, accs_tr[best_acc_val_idx], color='r', marker='*',
+    axes[1, 1].plot(best_acc_val_idx, accs_val[best_acc_val_idx], color='r', marker='*',
                     markersize=8, label=f"Best acc_val : {accs_val[best_acc_val_idx]:.3f}")
     axes[1, 1].legend()
 
@@ -659,7 +657,11 @@ def plot_training_metrics(metrics : tuple[list[float]]):
     # Show plot
     plt.show()
 
+
+
 def plot_heat_map(model : nn.Module, dataloader : DataLoader, n_games : int=51, vmax : int=0.25):
+    device = next(model.parameters()).device
+    
     data_iter = iter(dataloader)
     
     # Get attention maps
@@ -677,19 +679,19 @@ def plot_heat_map(model : nn.Module, dataloader : DataLoader, n_games : int=51, 
 
     fig.suptitle("Attention Maps of Model Heads")
 
-    sns.heatmap(attn_maps[0, :n_games, :n_games].cpu(), ax=axes[0, 0], cmap='plasma', cbar=True, vmin=0, vmax=0.1)
+    sns.heatmap(attn_maps[0, :n_games, :n_games].cpu(), ax=axes[0, 0], cmap='plasma', cbar=True, vmin=0, vmax=vmax)
     axes[0, 0].set_title("Attention Head 1")
     axes[0, 0].set_xlabel("Game attended to")
     axes[0, 0].set_ylabel("Game attending")
-    sns.heatmap(attn_maps[1, :n_games, :n_games].cpu(), ax=axes[0, 1], cmap='plasma', cbar=True, vmin=0, vmax=0.1)
+    sns.heatmap(attn_maps[1, :n_games, :n_games].cpu(), ax=axes[0, 1], cmap='plasma', cbar=True, vmin=0, vmax=vmax)
     axes[0, 1].set_title("Attention Head 2")
     axes[0, 1].set_xlabel("Game attended to")
     axes[0, 1].set_ylabel("Game attending")
-    sns.heatmap(attn_maps[2, :n_games, :n_games].cpu(), ax=axes[1, 0], cmap='plasma', cbar=True, vmin=0, vmax=0.1)
+    sns.heatmap(attn_maps[2, :n_games, :n_games].cpu(), ax=axes[1, 0], cmap='plasma', cbar=True, vmin=0, vmax=vmax)
     axes[1, 0].set_title("Attention Head 3")
     axes[1, 0].set_xlabel("Game attended to")
     axes[1, 0].set_ylabel("Game attending")
-    sns.heatmap(attn_maps[3, :n_games, :n_games].cpu(), ax=axes[1, 1], cmap='plasma', cbar=True, vmin=0, vmax=0.1)
+    sns.heatmap(attn_maps[3, :n_games, :n_games].cpu(), ax=axes[1, 1], cmap='plasma', cbar=True, vmin=0, vmax=vmax)
     axes[1, 1].set_title("Attention Head 4")
     axes[1, 1].set_xlabel("Game attended to")
     axes[1, 1].set_ylabel("Game attending")
