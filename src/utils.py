@@ -573,13 +573,17 @@ def visualize_regression_performance(targets : np.ndarray, preds : np.ndarray):
     axs[2,1].axhline(0, color='black', linewidth=1, linestyle='-')
     axs[2,1].grid()
 
-
     plt.show()
+
+
 
 def plot_training_metrics(metrics : tuple[list[float]]):
     mses_tr, mses_val, accs_tr, accs_val = metrics
     
-    best_val_idx = np.argmin(mses_val)
+    best_mse_tr_idx = np.argmin(mses_tr)
+    best_mse_val_idx = np.argmin(mses_val)
+    best_acc_tr_idx = np.argmax(accs_tr)
+    best_acc_val_idx = np.argmax(accs_val)
     
     fig, axes = plt.subplots(2, 2, figsize=(10, 8))
 
@@ -595,42 +599,59 @@ def plot_training_metrics(metrics : tuple[list[float]]):
     axes[0, 0].set_ylabel('mse_tr')
     axes[0, 0].set_yticks(y_axis_mse)
     axes[0, 0].grid(True)
-    axes[0, 0].plot(best_val_idx, mses_tr[best_val_idx], 'rx', markersize=8)
-    axes[0, 0].axhline(mses_tr[best_val_idx], color='r', linestyle='--')
-    axes[0, 0].axvline(best_val_idx, color='r', linestyle='--')
+    axes[0, 0].plot(best_mse_val_idx, mses_tr[best_mse_val_idx], 'rx', markersize=8,
+                    label=f"Best val epoch : mse_tr = {mses_tr[best_mse_val_idx]:.3f}")
+    axes[0, 0].axhline(mses_tr[best_mse_val_idx], color='r', linestyle='--')
+    axes[0, 0].axvline(best_mse_val_idx, color='r', linestyle='--')
+    axes[0, 0].plot(best_mse_tr_idx, mses_tr[best_mse_tr_idx], color='r', marker='*',
+                    markersize=8, label=f"Best mse_tr : {mses_tr[best_mse_tr_idx]:.3f}")
+    axes[0, 0].legend()
+    
 
     axes[0, 1].plot(mses_val, color='g')
     axes[0, 1].set_title('val_loss')
-    axes[0, 1].set_title('MSE VAL vs DEPTH')
+    axes[0, 1].set_title('MSE VAL vs EPOCH')
     axes[0, 1].set_xlabel('epoch')
     axes[0, 1].set_ylabel('mse_val')
     axes[0, 1].set_yticks(y_axis_mse)
     axes[0, 1].grid(True)
-    axes[0, 1].plot(best_val_idx, mses_val[best_val_idx], 'rx', markersize=8)
-    axes[0, 1].axhline(mses_val[best_val_idx], color='r', linestyle='--')
-    axes[0, 1].axvline(best_val_idx, color='r', linestyle='--')
+    axes[0, 1].plot(best_mse_val_idx, mses_val[best_mse_val_idx], 'rx', markersize=8, 
+                    label=f"Best val epoch : mse_val = {mses_val[best_mse_val_idx]:.3f}")
+    axes[0, 1].axhline(mses_val[best_mse_val_idx], color='r', linestyle='--')
+    axes[0, 1].axvline(best_mse_val_idx, color='r', linestyle='--')
+    axes[0, 1].plot(best_mse_val_idx, mses_val[best_mse_val_idx], color='r', marker='*',
+                    markersize=8, label=f"Best mse_val : {mses_val[best_mse_val_idx]:.3f}")
+    axes[0, 1].legend()
 
     axes[1, 0].plot(accs_tr, color='b')
     axes[1, 0].set_title('train_acc')
-    axes[1, 0].set_title('ACC TR vs DEPTH')
+    axes[1, 0].set_title('ACC TR vs EPOCH')
     axes[1, 0].set_xlabel('epoch')
     axes[1, 0].set_ylabel('acc_tr')
     axes[1, 0].set_yticks(y_axis_acc)
     axes[1, 0].grid(True)
-    axes[1, 0].plot(best_val_idx, accs_tr[best_val_idx], 'rx', markersize=8)
-    axes[1, 0].axhline(accs_tr[best_val_idx], color='r', linestyle='--')
-    axes[1, 0].axvline(best_val_idx, color='r', linestyle='--')
+    axes[1, 0].plot(best_mse_val_idx, accs_tr[best_mse_val_idx], 'rx', markersize=8,
+                    label=f"Best val epoch : acc_tr = {accs_tr[best_mse_val_idx]:.3f}")
+    axes[1, 0].axhline(accs_tr[best_mse_val_idx], color='r', linestyle='--')
+    axes[1, 0].axvline(best_mse_val_idx, color='r', linestyle='--')
+    axes[1, 0].plot(best_acc_tr_idx, accs_tr[best_acc_tr_idx], color='r', marker='*',
+                    markersize=8, label=f"Best acc_tr : {accs_tr[best_acc_tr_idx]:.3f}")
+    axes[1, 0].legend()
 
     axes[1, 1].plot(accs_val, color='m')
     axes[1, 1].set_title('val_loss')
-    axes[1, 1].set_title('ACC VAL vs DEPTH')
+    axes[1, 1].set_title('ACC VAL vs EPOCH')
     axes[1, 1].set_xlabel('epoch')
     axes[1, 1].set_ylabel('acc_val')
     axes[1, 1].set_yticks(y_axis_acc)
     axes[1, 1].grid(True)
-    axes[1, 1].plot(best_val_idx, accs_val[best_val_idx], 'rx', markersize=8)
-    axes[1, 1].axhline(accs_val[best_val_idx], color='r', linestyle='--')
-    axes[1, 1].axvline(best_val_idx, color='r', linestyle='--')
+    axes[1, 1].plot(best_mse_val_idx, accs_val[best_mse_val_idx], 'rx', markersize=8, 
+                    label=f"Best val epoch : acc_val = {accs_val[best_mse_val_idx]:.3f}")
+    axes[1, 1].axhline(accs_val[best_mse_val_idx], color='r', linestyle='--')
+    axes[1, 1].axvline(best_mse_val_idx, color='r', linestyle='--')
+    axes[1, 1].plot(best_acc_val_idx, accs_tr[best_acc_val_idx], color='r', marker='*',
+                    markersize=8, label=f"Best acc_val : {accs_val[best_acc_val_idx]:.3f}")
+    axes[1, 1].legend()
 
     # Add layout adjustments
     plt.tight_layout()
