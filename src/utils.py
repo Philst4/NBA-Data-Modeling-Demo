@@ -523,28 +523,28 @@ def visualize_regression_performance(targets : np.ndarray, preds : np.ndarray):
     fig.suptitle('Visualization of Regression Performance', fontsize=16)
 
     # Next
-    axs[0,0].hist(preds, bins=20, color='green', edgecolor='black', alpha=0.7)
+    axs[0,0].hist(preds, bins=40, color='yellow', edgecolor='black', alpha=0.7)
     axs[0,0].set_title('Histogram of preds')
     axs[0,0].set_xlabel('preds')
     axs[0,0].set_ylabel('Frequency')
     axs[0,0].grid(axis='y', alpha=0.75)
 
 
-    axs[0,1].hist(targets, bins=20, color='yellow', edgecolor='black', alpha=0.7)
+    axs[0,1].hist(targets, bins=40, color='lime', edgecolor='black', alpha=0.7)
     axs[0,1].set_title('Histogram of targets')
     axs[0,1].set_xlabel('targets')
     axs[0,1].set_ylabel('Frequency')
     axs[0,1].grid(axis='y', alpha=0.75)
 
 
-    axs[1,0].hist(mae_per_instance, bins=20, color='skyblue', edgecolor='black', alpha=0.7)
+    axs[1,0].hist(mae_per_instance, bins=40, color='skyblue', edgecolor='black', alpha=0.7)
     axs[1,0].set_title('Histogram of MAE per Instance')
     axs[1,0].set_xlabel('MAE')
     axs[1,0].set_ylabel('Frequency')
     axs[1,0].grid(axis='y', alpha=0.75)
 
     # Next
-    axs[1,1].hist(mse_per_instance, bins=20, color='orange', edgecolor='black', alpha=0.7)
+    axs[1,1].hist(mse_per_instance, bins=40, color='orange', edgecolor='black', alpha=0.7)
     axs[1,1].set_title('Histogram of MSE per Instance')
     axs[1,1].set_xlabel('MSE')
     axs[1,1].set_ylabel('Frequency')
