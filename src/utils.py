@@ -587,8 +587,8 @@ def plot_training_metrics(metrics : tuple[list[float]]):
 
     fig.suptitle('TRAINING METRICS', fontsize=16)
 
-    y_axis_mse = np.arange(.8, 1.3, .05)
-    y_axis_acc = np.arange(.5, .7, .01)
+    y_axis_mse = np.arange(0.60, 1.02, .02)
+    y_axis_acc = np.arange(0.50, 0.71, .01)
 
     axes[0, 0].plot(mses_tr, color='y')
     axes[0, 0].set_title('train_loss')
@@ -596,7 +596,11 @@ def plot_training_metrics(metrics : tuple[list[float]]):
     axes[0, 0].set_xlabel('epoch')
     axes[0, 0].set_ylabel('mse_tr')
     axes[0, 0].set_yticks(y_axis_mse)
+    axes[0, 0].set_ylim(min(y_axis_mse), max(y_axis_mse))
     axes[0, 0].grid(True)
+    for y in np.arange(0.6, 1.01, 0.1):
+        axes[0, 0].axhline(y, color='black', linestyle='-', linewidth=0.5) 
+
     axes[0, 0].plot(best_mse_val_idx, mses_tr[best_mse_val_idx], 'rx', markersize=8,
                     label=f"Best val epoch : mse_tr = {mses_tr[best_mse_val_idx]:.3f}")
     axes[0, 0].axhline(mses_tr[best_mse_val_idx], color='r', linestyle='--')
@@ -612,7 +616,11 @@ def plot_training_metrics(metrics : tuple[list[float]]):
     axes[0, 1].set_xlabel('epoch')
     axes[0, 1].set_ylabel('mse_val')
     axes[0, 1].set_yticks(y_axis_mse)
+    axes[0, 1].set_ylim(min(y_axis_mse), max(y_axis_mse))
     axes[0, 1].grid(True)
+    for y in np.arange(0.6, 1.01, 0.1):
+        axes[0, 1].axhline(y, color='black', linestyle='-', linewidth=0.5) 
+
     axes[0, 1].plot(best_mse_val_idx, mses_val[best_mse_val_idx], 'rx', markersize=8, 
                     label=f"Best val epoch : mse_val = {mses_val[best_mse_val_idx]:.3f}")
     axes[0, 1].axhline(mses_val[best_mse_val_idx], color='r', linestyle='--')
@@ -627,7 +635,11 @@ def plot_training_metrics(metrics : tuple[list[float]]):
     axes[1, 0].set_xlabel('epoch')
     axes[1, 0].set_ylabel('acc_tr')
     axes[1, 0].set_yticks(y_axis_acc)
+    axes[1, 0].set_ylim(min(y_axis_acc), max(y_axis_acc))
     axes[1, 0].grid(True)
+    for y in np.arange(0.5, 0.71, 0.05):
+        axes[1, 0].axhline(y, color='black', linestyle='-', linewidth=0.5) 
+
     axes[1, 0].plot(best_mse_val_idx, accs_tr[best_mse_val_idx], 'rx', markersize=8,
                     label=f"Best val epoch : acc_tr = {accs_tr[best_mse_val_idx]:.3f}")
     axes[1, 0].axhline(accs_tr[best_mse_val_idx], color='r', linestyle='--')
@@ -642,7 +654,11 @@ def plot_training_metrics(metrics : tuple[list[float]]):
     axes[1, 1].set_xlabel('epoch')
     axes[1, 1].set_ylabel('acc_val')
     axes[1, 1].set_yticks(y_axis_acc)
+    axes[1, 1].set_ylim(min(y_axis_acc), max(y_axis_acc))
     axes[1, 1].grid(True)
+    for y in np.arange(0.5, 0.71, 0.05):
+        axes[1, 1].axhline(y, color='black', linestyle='-', linewidth=0.5) 
+
     axes[1, 1].plot(best_mse_val_idx, accs_val[best_mse_val_idx], 'rx', markersize=8, 
                     label=f"Best val epoch : acc_val = {accs_val[best_mse_val_idx]:.3f}")
     axes[1, 1].axhline(accs_val[best_mse_val_idx], color='r', linestyle='--')
