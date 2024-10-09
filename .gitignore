@@ -14,6 +14,9 @@ __pycache__/
 /data/
 # Logs
 /*logs
+# Models
+/src/models/model_0.py
+/src/models/model_1.py
 
 # Other to ignore (for now)
 #Tests

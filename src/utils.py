@@ -513,70 +513,63 @@ def plot_corrs_for_windows(window_sizes, results):
     
 def visualize_regression_performance(targets : np.ndarray, preds : np.ndarray):
 
-    mae_per_instance = (targets - preds)
-    mse_per_instance = mae_per_instance ** 2
+    mse_per_instance = (targets - preds) ** 2
 
     # Plot histogram of MSE
-    # Create a 3x2 grid of plots
-    fig, axs = plt.subplots(3, 2, figsize=(10, 15))
+    # Create a 2x2 grid of plots
+    fig, axs = plt.subplots(2, 2, figsize=(10, 15))
 
     fig.suptitle('Visualization of Regression Performance', fontsize=16)
 
     # Next
-    axs[0,0].hist(preds, bins=40, color='yellow', edgecolor='black', alpha=0.7)
+    axs[0,0].hist(preds, bins=40, color='#ADD8E6', edgecolor='black', alpha=0.7)
     axs[0,0].set_title('Histogram of preds')
     axs[0,0].set_xlabel('preds')
     axs[0,0].set_ylabel('Frequency')
     axs[0,0].grid(axis='y', alpha=0.75)
 
 
-    axs[0,1].hist(targets, bins=40, color='lime', edgecolor='black', alpha=0.7)
+    axs[0,1].hist(targets, bins=40, color='#00079F', edgecolor='black', alpha=0.7)
     axs[0,1].set_title('Histogram of targets')
     axs[0,1].set_xlabel('targets')
     axs[0,1].set_ylabel('Frequency')
     axs[0,1].grid(axis='y', alpha=0.75)
 
-
-    axs[1,0].hist(mae_per_instance, bins=40, color='skyblue', edgecolor='black', alpha=0.7)
-    axs[1,0].set_title('Histogram of MAE per Instance')
-    axs[1,0].set_xlabel('MAE')
-    axs[1,0].set_ylabel('Frequency')
-    axs[1,0].grid(axis='y', alpha=0.75)
-
-    # Next
-    axs[1,1].hist(mse_per_instance, bins=40, color='orange', edgecolor='black', alpha=0.7)
-    axs[1,1].set_title('Histogram of MSE per Instance')
-    axs[1,1].set_xlabel('MSE')
-    axs[1,1].set_ylabel('Frequency')
-    axs[1,1].grid(axis='y', alpha=0.75)
-
     correct = np.sign(preds) == np.sign(targets)
 
-    axs[2,0].scatter(targets[correct], preds[correct], sizes=[1], color='skyblue', label='Correct predictions')
-    axs[2,0].scatter(targets[~correct], preds[~correct], sizes=[1], color='orange', label='Incorrect predictions')
-    axs[2,0].plot([targets.min(), targets.max()], [targets.min(), targets.max()], color='red', linestyle='--', label='y = y_pred')  # Reference line
-    axs[2,0].set_title('Targets vs Predicted Values')
-    axs[2,0].set_xlabel('Targets')
-    axs[2,0].set_ylabel('Preds')
-    axs[2,0].axhline(0, color='black', linewidth=1, linestyle='-')
-    axs[2,0].axvline(0, color='black', linewidth=1, linestyle='-')
-    axs[2,0].legend()
-    axs[2,0].grid()
-    axs[2,0].axis('equal')  # Equal scaling for better visualization
+    axs[1,0].scatter(targets[correct], preds[correct], sizes=[1], color='skyblue', label='Correct predictions')
+    axs[1,0].scatter(targets[~correct], preds[~correct], sizes=[1], color='orange', label='Incorrect predictions')
+    axs[1,0].plot([targets.min(), targets.max()], [targets.min(), targets.max()], color='red', linestyle='--', label='y = y_pred')  # Reference line
+    axs[1,0].set_title('Targets vs Predicted Values')
+    axs[1,0].set_xlabel('Targets')
+    axs[1,0].set_ylabel('Preds')
+    axs[1,0].axhline(0, color='black', linewidth=1, linestyle='-')
+    axs[1,0].axvline(0, color='black', linewidth=1, linestyle='-')
+    axs[1,0].legend()
+    axs[1,0].grid()
+    axs[1,0].axis('equal')  # Equal scaling for better visualization
 
-    axs[2,1].scatter(targets[correct], mse_per_instance[correct], color='skyblue', sizes=[1])
-    axs[2,1].scatter(targets[~correct], mse_per_instance[~correct], color='orange', sizes=[1])
-    axs[2,1].set_title('Targets vs MSE')
-    axs[2,1].set_xlabel('Targets')
-    axs[2,1].set_ylabel('Mean Squared Error (MSE)')
-    axs[2,1].axvline(0, color='black', linewidth=1, linestyle='-')
-    axs[2,1].axhline(0, color='black', linewidth=1, linestyle='-')
-    axs[2,1].grid()
+    axs[1,1].scatter(targets[correct], mse_per_instance[correct], color='skyblue', sizes=[1])
+    axs[1,1].scatter(targets[~correct], mse_per_instance[~correct], color='orange', sizes=[1])
+    axs[1,1].set_title('Targets vs MSE')
+    axs[1,1].set_xlabel('Targets')
+    axs[1,1].set_ylabel('Mean Squared Error (MSE)')
+    axs[1,1].axvline(0, color='black', linewidth=1, linestyle='-')
+    axs[1,1].axhline(0, color='black', linewidth=1, linestyle='-')
+    axs[1,1].grid()
 
     plt.show()
 
-def plot_training_metrics(metrics : tuple[list[float]]):
-    mses_tr, mses_val, accs_tr, accs_val = metrics
+def plot_training_metrics(
+    mses_tr, 
+    mses_val, 
+    accs_tr, 
+    accs_val,
+    mse_range=(0.6, 1.0),
+    mse_step=0.02,
+    acc_range=(0.5, 0.7),
+    acc_step=0.01
+):
     
     best_mse_tr_idx = np.argmin(mses_tr)
     best_mse_val_idx = np.argmin(mses_val)
@@ -587,8 +580,8 @@ def plot_training_metrics(metrics : tuple[list[float]]):
 
     fig.suptitle('TRAINING METRICS', fontsize=16)
 
-    y_axis_mse = np.arange(0.60, 1.02, .02)
-    y_axis_acc = np.arange(0.50, 0.71, .01)
+    y_axis_mse = np.arange(mse_range[0], mse_range[1] + mse_step, mse_step)
+    y_axis_acc = np.arange(acc_range[0], acc_range[1] + acc_step, acc_step)
 
     axes[0, 0].plot(mses_tr, color='y')
     axes[0, 0].set_title('train_loss')
