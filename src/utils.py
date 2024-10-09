@@ -517,7 +517,7 @@ def visualize_regression_performance(targets : np.ndarray, preds : np.ndarray):
 
     # Plot histogram of MSE
     # Create a 2x2 grid of plots
-    fig, axs = plt.subplots(2, 2, figsize=(10, 15))
+    fig, axs = plt.subplots(2, 2, figsize=(10, 12))
 
     fig.suptitle('Visualization of Regression Performance', fontsize=16)
 
@@ -529,7 +529,7 @@ def visualize_regression_performance(targets : np.ndarray, preds : np.ndarray):
     axs[0,0].grid(axis='y', alpha=0.75)
 
 
-    axs[0,1].hist(targets, bins=40, color='#00079F', edgecolor='black', alpha=0.7)
+    axs[0,1].hist(targets, bins=40, color='#0096FF', edgecolor='black', alpha=0.7)
     axs[0,1].set_title('Histogram of targets')
     axs[0,1].set_xlabel('targets')
     axs[0,1].set_ylabel('Frequency')
