@@ -45,7 +45,7 @@ def mirror(
     games : pd.DataFrame, 
     cols_to_mirror=None,
     cols_not_to_mirror=None,
-) -> None:
+) -> pd.DataFrame:
     print(" * Mirroring data ...")
     
     error_str1 = "Neither cols_to_mirror or cols_not_to_mirror provided; please provide one (empty list accepted)"
@@ -53,28 +53,22 @@ def mirror(
     error_str2 = "Only provide one of cols_to_mirror and cols_not_to_mirror"
     assert(not (cols_to_mirror is not None and cols_not_to_mirror is not None)), error_str2
     
-    # First, save away_condn, home_condn
-    games.sort_values(by='GAME_ID', inplace=True)
-    away_condn = games['IS_HOME'] == 0
-    home_condn = games['IS_HOME'] == 1
-    
     # Identify columns to be mirrored; initialize new column names
     if cols_not_to_mirror is not None:
         cols_to_mirror = [col for col in list(games.columns) if col not in cols_not_to_mirror]
-    col_for_mapping = {col: col + '_for' for col in cols_to_mirror}
+    else:
+        cols_not_to_mirror = [col for col in list(games.columns) if col not in cols_to_mirror]
+    col_for_mapping = {col : col for col in cols_not_to_mirror} | {col : col + '_for' for col in cols_to_mirror}
+    col_ag_mapping = {col : col + '_ag' for col in cols_to_mirror}
 
-    # Rename columns existing columns to cols_for
+    # Sort by 'UNIQUE_ID'
+    games.sort_values(by='UNIQUE_ID', inplace=True)
+
+    # Self-join on GAME_ID to align home and away games
+    games_ag = games[['UNIQUE_ID'] + cols_to_mirror].rename(columns=col_ag_mapping, inplace=False)
+    games_ag['UNIQUE_ID'] = games_ag.loc[:, 'UNIQUE_ID'].apply(lambda unique_id : unique_id[:-2] + '_0' if unique_id[-2:] == '_1' else unique_id[:-2] + '_1')
     games.rename(columns=col_for_mapping, inplace=True)
-
-    # Initialize new columns for opposing stats
-    cols_ag = [col + '_ag' for col in cols_to_mirror]
-    games[cols_ag] = None
-
-    # Fill in new columns with data from opposing team's game instance
-    # Identify matching game instances using home-away conditions
-    cols_for = list(col_for_mapping.values())
-    games.loc[away_condn, cols_ag] = games.loc[home_condn, cols_for].values
-    games.loc[home_condn, cols_ag] = games.loc[away_condn, cols_for].values
+    return pd.merge(games, games_ag, on='UNIQUE_ID')
 
 def get_summary_stats(
     games : pd.DataFrame, 

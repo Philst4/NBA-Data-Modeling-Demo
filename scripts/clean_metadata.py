@@ -72,7 +72,7 @@ if __name__ == "__main__":
     # (3) Set types (N/A)
     # Not needed
     pass
-    mirror(
+    game_metadata = mirror(
         game_metadata, 
         cols_to_mirror=['NEW_TEAM_ID', 'TEAM_ABBREVIATION']
     ) 

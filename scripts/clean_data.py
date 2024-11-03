@@ -76,7 +76,7 @@ if __name__ == "__main__":
     drop_cols(games, COLS_TO_DROP_B)
 
     # (5) 'Mirror' data to contain opposing stats, drop unneeded
-    mirror(
+    games = mirror(
         games, 
         cols_not_to_mirror=['UNIQUE_ID', 'GAME_ID']
     )
