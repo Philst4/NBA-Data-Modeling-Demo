@@ -1,6 +1,7 @@
 import sys
 import os
 import warnings
+import time
 
 # Add the project root to the Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -26,7 +27,8 @@ from src.utils import (
 
 def ingest_from_leaguegamefinder(
     start_season: int = None,
-    start_date: str = None
+    start_date: str = None,
+    sleep_time : float = 1.0
 ) -> Optional[pd.DataFrame]:
     """Reads in data via NBA API from season first specified to latest or from start date.
 
@@ -77,7 +79,10 @@ def ingest_from_leaguegamefinder(
             season_type_nullable='Regular Season',
             league_id_nullable='00'  # Specifies NBA league
         )
+        # Sleep after each request
+        time.sleep(sleep_time)
 
+        # Handle received data
         season_df = game_finder.get_data_frames()[0]
         season_df_len = len(season_df)
         season_df = season_df.dropna(subset=['WL'])  # Drop games still in progress

@@ -69,7 +69,7 @@ if __name__ == "__main__":
         games = games.drop_duplicates(subset=['UNIQUE_ID'])
         len_total = len(games)
         n_duplicates = (len_existing + len_new) - len_total
-        print(f" * {n_duplicates} games found in existing reserve, added {len_total - len_existing} new games")
+        print(f" * {n_duplicates} of ingested games found in existing reserve, added {len_total - len_existing} new games")
     else:
         games = new_games
         len_total = len(games)
