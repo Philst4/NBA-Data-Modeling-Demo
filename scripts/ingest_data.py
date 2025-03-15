@@ -59,7 +59,7 @@ if __name__ == "__main__":
     new_games['IS_HOME'] = new_games.apply(lambda row : int('vs.' in row['MATCHUP']), axis=1)
     
     # (5) Add 'UNIQUE_ID', composite key of 'GAME_ID' and 'IS_HOME'
-    new_games['UNIQUE_ID'] = new_games.apply(lambda row: str(row['GAME_ID']) + '_' + str(row['IS_HOME']), axis=1)
+    new_games['UNIQUE_ID'] = 10 * new_games['GAME_ID'].astype(int) + new_games['IS_HOME']
     
     # (6) Handle integrating into existing reserve
     if existing_games is not None:

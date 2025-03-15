@@ -46,6 +46,9 @@ def mirror(
     cols_to_mirror=None,
     cols_not_to_mirror=None,
 ) -> pd.DataFrame:
+    """
+    Adds opposing stats for game instances to each game instance.
+    """
     print(" * Mirroring data ...")
     
     error_str1 = "Neither cols_to_mirror or cols_not_to_mirror provided; please provide one (empty list accepted)"
@@ -64,9 +67,11 @@ def mirror(
     # Sort by 'UNIQUE_ID'
     games.sort_values(by='UNIQUE_ID', inplace=True)
 
-    # Self-join on GAME_ID to align home and away games
+    # Flip 'UNIQUE_ID' on opposing games to join properly
+    # If last digit is 0 make it 1, elif last digit is 1 make it 0
     games_ag = games[['UNIQUE_ID'] + cols_to_mirror].rename(columns=col_ag_mapping, inplace=False)
-    games_ag['UNIQUE_ID'] = games_ag.loc[:, 'UNIQUE_ID'].apply(lambda unique_id : unique_id[:-2] + '_0' if unique_id[-2:] == '_1' else unique_id[:-2] + '_1')
+    f = lambda u_id : u_id + 1 if u_id % 10 == 0 else u_id - 1
+    games_ag['UNIQUE_ID'] = games_ag.loc[:, 'UNIQUE_ID'].apply(f)
     games.rename(columns=col_for_mapping, inplace=True)
     return pd.merge(games, games_ag, on='UNIQUE_ID')
 
