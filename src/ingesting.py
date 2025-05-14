@@ -10,7 +10,7 @@ sys.path.append(project_root)
 # External imports
 from nba_api.stats.endpoints import (
     leaguegamefinder,
-    shotchartdetail
+    shotchartdetail,
 )
 from nba_api.stats.static import (
     teams
@@ -103,7 +103,7 @@ def ingest_from_leaguegamefinder(
 
 # Dictionary of ingestion functions
 ingestion_fns = {
-    'leaguegamefinder' : ingest_from_leaguegamefinder,
+    'leaguegamefinder' : ingest_from_leaguegamefinder
 }
 
 

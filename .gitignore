@@ -12,11 +12,19 @@ __pycache__/
 
 # Data
 /data/
+
 # Logs
 /*logs
-# Models
-/src/models/model_0.py
-/src/models/model_1.py
+
+# Everything to ignore from src
+/src/*models
+/src/dataloading.py
+/src/training.py
+
+# Everything to ignore from scripts
+/scripts/check_training_logs.py
+/scripts/save_from_ckpt.py
+/scripts/train_model.py
 
 # Other to ignore (for now)
 #Tests
