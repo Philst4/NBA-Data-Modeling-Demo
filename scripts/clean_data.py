@@ -66,29 +66,23 @@ if __name__ == "__main__":
 
     # (3) Add new features, drop unneeded after
     drop_cols(games, ['TEAM_ID'])
-
-    # (4) Generate table of summarizing stats, drop unneeded
-    summary_stats = get_summary_stats(
-        games, 
-        leave_out_cols=['UNIQUE_ID', 'GAME_ID']
-    )
     
     drop_cols(games, COLS_TO_DROP_B)
 
-    # (5) 'Mirror' data to contain opposing stats, drop unneeded
+    # (4) 'Mirror' data to contain opposing stats, drop unneeded
     games = mirror(
         games, 
         cols_not_to_mirror=['UNIQUE_ID', 'GAME_ID']
     )
     drop_cols(games, COLS_TO_DROP_C)
     
-    # (6) Data-specific cleaning processes
+    # (5) Data-specific cleaning processes
     fill_plus_minus(games)
     
-    # (7) Deal with remaining NaN's
+    # (6) Deal with remaining NaN's
     deal_w_NaNs(games)
     
-    # (8) Save cleaned data
+    # (7) Save cleaned data
     save_to_db(
         games, 
         CLEAN_DIR,
@@ -96,10 +90,3 @@ if __name__ == "__main__":
         MAIN_TABLE_NAME
     )
     
-    save_to_db(
-        summary_stats, 
-        CLEAN_DIR,
-        DB_NAME,
-        SUMMARY_TABLE_NAME,
-        index=True
-    )
