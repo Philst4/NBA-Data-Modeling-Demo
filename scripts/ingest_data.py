@@ -71,12 +71,12 @@ if __name__ == "__main__":
         n_duplicates = (len_existing + len_new) - len_total
         print(f" * {n_duplicates} of ingested games found in existing reserve, added {len_total - len_existing} new games")
     else:
-        games = new_games
+        games = new_games.drop_duplicates(subset=['UNIQUE_ID'])
         len_total = len(games)
     
     # (7) Save file
     save_as_csv(
-        games=games, 
+        df=games, 
         write_dir=RAW_DIR,
         csv_name=RAW_FILE_NAME,
     )

@@ -20,7 +20,7 @@ from typing import Optional
 
 # Internal imports
 from src.utils import (
-    season_to_str
+    season_int_to_str
 )
 
 #### INGESTION FUNCTION VARIANTS
@@ -63,11 +63,11 @@ def ingest_from_leaguegamefinder(
         start_season = 1983  # Start season with reliable data
     
     elif start_season > current_season:
-        print(f" * Season {season_to_str(start_season)} hasn't happened yet; starting with {season_to_str(current_season)}")
+        print(f" * Season {season_int_to_str(start_season)} hasn't happened yet; starting with {season_int_to_str(current_season)}")
         start_season = current_season
 
     # Get season strings
-    seasons = list(map(season_to_str, range(start_season, current_season + 1)))
+    seasons = list(map(season_int_to_str, range(start_season, current_season + 1)))
     print(f" * Reading in regular season games from {seasons[0]} to {seasons[-1]}")
 
     # Read in data season by season
