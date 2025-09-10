@@ -116,6 +116,37 @@ def query_db(db_path : str, query : str) -> pd.DataFrame:
     conn.close()
     return dataframe
 
+def get_prev_0_modeling_data(db_path="data/clean/my_database.db"):
+    """
+    Returns the modeling data, feature names, target name
+    """
+    
+    game_metadata = query_db(db_path, "SELECT * from game_metadata")
+    game_data = query_db(db_path, f"SELECT * from game_data")
+    
+    # Normalize the game data
+    normalized_game_data = get_normalized_by_season(
+        game_data=game_data,
+        game_metadata=game_metadata,
+    )
+    
+    # Get rolling averages
+    normalized_prev_0_game_data = get_rolling_avgs(
+        game_data=normalized_game_data,
+        game_metadata=game_metadata,
+        windows=[0]
+    )
+    
+    # Merge to get modeling data
+    modeling_data = pd.merge(game_metadata, normalized_prev_0_game_data, on='UNIQUE_ID')
+    modeling_data = pd.merge(modeling_data, normalized_game_data[['UNIQUE_ID', 'IS_HOME_for', 'IS_HOME_ag', 'PLUS_MINUS_for']], on='UNIQUE_ID')
+    
+    # Get features + target
+    prev_0_stat_names = [col for col in list(normalized_prev_0_game_data.columns) if col != 'UNIQUE_ID']
+    features = ['IS_HOME_for', 'IS_HOME_ag'] + prev_0_stat_names
+    target = 'PLUS_MINUS_for'
+    
+    return modeling_data, features, target
 
 #### COMMON INFO GATHERING/CHECKS ####
 

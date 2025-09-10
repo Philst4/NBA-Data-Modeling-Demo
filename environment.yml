@@ -1,0 +1,19 @@
+name: nba
+channels:
+  - defaults
+dependencies:
+  - python=3.10
+  - pandas
+  - matplotlib
+  - numpy
+  - pyarrow
+  - yaml
+  - pyyaml
+  - seaborn
+  - cpuonly
+  - pytorch
+  - torchaudio
+  - torchvision
+  - optuna
+  - scikit-learn
+prefix: /opt/anaconda3/envs/nba
