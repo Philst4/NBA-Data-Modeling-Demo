@@ -1,9 +1,6 @@
 import sys
 import os
 import argparse
-import importlib.util
-import sys
-from pathlib import Path
 from time import time
 
 # Add the project root to the Python path
@@ -18,35 +15,9 @@ import optuna
 
 # Internal imports
 from src.utils import (
+    load_modeling_config,
     get_prev_0_modeling_data
 )
-
-# Required variables that must exist in the config
-REQUIRED_CONFIG_VARS = [
-    "model_class",
-    "hyperparam_space",
-    "objective_fn",
-    "val_seasons",
-    "study_name",
-]
-
-def load_config(config_path):
-    """Load a Python config file as a module."""
-    config_path = Path(config_path)
-    if not config_path.exists():
-        raise FileNotFoundError(f"Config file {config_path} not found.")
-
-    spec = importlib.util.spec_from_file_location("config", str(config_path))
-    config = importlib.util.module_from_spec(spec)
-    sys.modules["config"] = config
-    spec.loader.exec_module(config)
-
-    # Validate required variables
-    missing_vars = [var for var in REQUIRED_CONFIG_VARS if not hasattr(config, var)]
-    if missing_vars:
-        raise ValueError(f"Config file is missing required variables: {missing_vars}")
-
-    return config
 
 def acc(y, y_preds):
     return ((y > 0) == (y_preds > 0)).astype(int).mean()
@@ -215,7 +186,7 @@ def main():
     n_jobs = args.n_jobs
         
     # Read modeling config
-    modeling_config = load_config(args.modeling_config)
+    modeling_config = load_modeling_config(args.modeling_config)
     
     # Get modeling data
     modeling_data, features, target = get_prev_0_modeling_data()

@@ -9,7 +9,7 @@ objective_fn = root_mean_squared_error
 val_seasons = [2020, 2021, 2022, 2023, 2024]
 study_name = "lasso_study"
 
-n_train_seasons_suggestion = ("int", {"low" : 5, "high" : 50}) # Number of training seasons to use
+n_train_seasons_suggestion = ("int", {"low" : 1, "high" : 50}) # Number of training seasons to use
 
 # NOTE: hyperparam space will be dict[str, tuple],
 # where the tuple is (type of hyperparam, key_word_args)

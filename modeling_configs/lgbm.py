@@ -32,4 +32,4 @@ objective_fn = root_mean_squared_error
 val_seasons = [2020, 2021, 2022, 2023, 2024]
 study_name = "lgbm_study"
 
-n_train_seasons_suggestion = ("int", {"low" : 5, "high" : 50}) # Number of training seasons to use
+n_train_seasons_suggestion = ("int", {"low" : 1, "high" : 50}) # Number of training seasons to use
