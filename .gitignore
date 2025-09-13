@@ -29,7 +29,6 @@ __pycache__/
 # Everything to ignore from scripts
 /scripts/check_training_logs.py
 /scripts/save_from_ckpt.py
-/scripts/train_model.py
 
 # Other to ignore (for now)
 #Tests
