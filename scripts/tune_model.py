@@ -10,13 +10,25 @@ sys.path.append(project_root)
 # External imports
 import pandas as pd
 import numpy as np
-from sklearn.metrics import mean_absolute_error, root_mean_squared_error
+from sklearn.metrics import (
+    mean_absolute_error, 
+    root_mean_squared_error,
+    r2_score,
+    roc_auc_score,
+)
 import optuna
+import torch
+import torch.nn as nn
 
 # Internal imports
 from src.utils import (
     load_modeling_config,
     get_prev_0_modeling_data
+)
+from train_model import (
+    train_sklearn,
+    train_torch,
+    predict_torch
 )
 
 def acc(y, y_preds):
@@ -24,13 +36,17 @@ def acc(y, y_preds):
 
 def backtest(
     model_class, 
-    hyperparams, 
+    model_hyperparams, 
     modeling_data, 
     features, 
     target, 
     val_seasons,
     n_train_seasons,
     objective_fn,
+    batch_size=None, # Start of torch-specific args
+    optimizer_class=None,
+    optimizer_hyperparams=None,
+    n_epochs=None,
     verbose=True
 ):
     """
@@ -41,7 +57,9 @@ def backtest(
     # For verbose
     maes = []
     rmses = []
+    r2_scores = []
     accs = []
+    roc_auc_scores = []
     times = []
     
     for i, val_season in enumerate(val_seasons):
@@ -63,37 +81,82 @@ def backtest(
         assert len(training_data) > 0, f"No training data when val_season={val_season}"
         assert len(val_data) > 0, f"No validation data when val_season={val_season}"
         
-        # Get features/target
-        X_tr = training_data[features]
-        y_tr = training_data[target]
-        X_val = val_data[features]
-        y_val = val_data[target]
-
-        # Initialize a new model instance
-        model = model_class(**hyperparams)
-        
-        # Fit the model on the training data
-        model.fit(X_tr, y_tr)
+        if not issubclass(model_class, nn.Module):
+            # For sklearn-style model setups         
+            # Get model instance fit on the training data
+            model = train_sklearn(
+                model_class,
+                model_hyperparams,
+                training_data,
+                features,
+                target
+            )
+            
+            # Predict for validation set
+            X_val = val_data[features]
+            y_val = val_data[target]
+            y_val_preds = model.predict(X_val)
+            
+            # Evaluate
+            score = objective_fn(y_val_preds, y_val)
+            
+        else:
+            # For torch-style model setups
+            # Get model instance fit on the training data
+            
+            model = train_torch(
+                model_class,
+                model_hyperparams,
+                training_data,
+                features,
+                target,
+                batch_size,
+                optimizer_class,
+                optimizer_hyperparams,
+                objective_fn,
+                n_epochs
+            )
+            
+            # Predict for validation set
+            # TODO: make a 'predict_torch' function.
+            y_val_preds = predict_torch(
+                model, 
+                val_data, 
+                features, 
+                batch_size
+            )
+            y_val = torch.tensor(val_data[[target]].values)
+            score = objective_fn(y_val_preds, y_val).numpy()
+            
+            # Convert to numpy for next part
+            y_val_preds = y_val_preds.numpy()
+            y_val = y_val.numpy()
+            
         
         # Evaluate the model on the validation data
-        y_val_preds = model.predict(X_val)
-        
-        # Calculate score from objective function
-        score = objective_fn(y_val_preds, y_val)
         scores.append(score)
         
         iter_end_time = time()
-        
+    
         maes.append(mean_absolute_error(y_val, y_val_preds))
         rmses.append(root_mean_squared_error(y_val, y_val_preds))
+        r2_scores.append(r2_score(y_val, y_val_preds))
         accs.append(acc(y_val, y_val_preds))
+        roc_auc_scores.append(
+            roc_auc_score(
+                (y_val > 0).astype(int), 
+                y_val_preds
+            )
+        )
         times.append(iter_end_time - iter_start_time)
         
         if verbose:
             # Print metrics
             print(f" -> MAE: {maes[-1]:.3f}")
             print(f" -> RMSE: {rmses[-1]:.3f}")
+            print(f" -> R^2 Score: {r2_scores[-1]:.3f}")
             print(f" -> Accuracy: {accs[-1]:.3f}")
+            print(f" -> ROC AUC Score: {roc_auc_scores[-1]:.3f}")
             print(f" -> Time to fit: {times[-1]:3f} seconds")
             
     
@@ -102,20 +165,56 @@ def backtest(
         print(f"\n * Average Overall Metrics:")
         print(f" -> MAE: {np.mean(maes):.3f}")
         print(f" -> RMSE: {np.mean(rmses):.3f}")
+        print(f" -> R^2 Score: {np.mean(r2_scores):.3f}")
         print(f" -> Accuracy: {np.mean(accs):.3f}")
+        print(f" -> ROC AUC Score: {np.mean(roc_auc_scores):.3f}")
         print(f" -> Time to fit: {np.mean(times):3f} seconds")
          
     return scores
 
+def sample_hyperparam(trial, name, specs):
+    """
+    pass
+    """
+    if not isinstance(specs, tuple):
+        # For non-tunable
+        return specs
+    else:
+        # For tunable
+        ptype = specs[0]
+        if ptype == "float":
+            return trial.suggest_float(name, **specs[1])
+        elif ptype == "int":
+            return trial.suggest_int(name, **specs[1])
+        elif ptype == "categorical":
+            return trial.suggest_categorical(name, **specs[1]) 
+        else:
+            raise ValueError(f"Unknown param type: {ptype}")
+
+def sample_hyperparams(trial, hyperparam_space):
+    """
+    Dynamically samples hyperparameters optuna-style, given sampling space.
+    """
+    hyperparams = {}
+    for name, specs in hyperparam_space.items():
+        hyperparams[name] = sample_hyperparam(trial, name, specs)
+    return hyperparams
+
 def make_objective(
     model_class, 
-    hyperparam_space, 
+    model_hyperparam_space, 
     modeling_data, 
     features, 
     target,
     val_seasons,
-    n_train_seasons_suggestion,
-    objective_fn
+    n_train_seasons_space,
+    objective_fn,
+    batch_size=None,
+    optimizer_class=None,
+    optimizer_hyperparam_space=None,
+    n_epochs=None,
+    verbose=True
+    
 ):
     """
     Makes a backtesting optuna objective function for some configuration of the following:
@@ -128,37 +227,35 @@ def make_objective(
     """
     
     def objective(trial):
-        # Dynamically sample hyperparameters
-        hyperparams = {}
-        for name, specs in hyperparam_space.items():
-            if not isinstance(specs, tuple):
-                # For non-tunable
-                hyperparams[name] = specs
-            else:
-                # For tunable
-                ptype = specs[0]
-                if ptype == "float":
-                    hyperparams[name] = trial.suggest_float(name, **specs[1])
-                elif ptype == "int":
-                    hyperparams[name] = trial.suggest_int(name, **specs[1])
-                elif ptype == "categorical":
-                    hyperparams[name] = trial.suggest_categorical(name, **specs[1]) 
-                else:
-                    raise ValueError(f"Unknown param type: {ptype}")
+        # Sample model hyperparameters
+        model_hyperparams = sample_hyperparams(trial, model_hyperparam_space)
         
-        # Handle n_train_seasons
-        n_train_seasons = trial.suggest_int("n_train_seasons", **n_train_seasons_suggestion[1])
+        # Sample n_train_seasons
+        n_train_seasons = sample_hyperparam(trial, "n_train_seasons", n_train_seasons_space)
         
+        # For torch setup only
+        if issubclass(model_class, nn.Module):
+            # Sample optimizer hyperparameters
+            optimizer_hyperparams = sample_hyperparams(trial, optimizer_hyperparam_space)
+            
+        else:
+            optimizer_hyperparams = None
+            
         # Backtest the model
         scores = backtest(
             model_class, 
-            hyperparams, 
+            model_hyperparams, 
             modeling_data, 
             features, 
             target, 
             val_seasons,
             n_train_seasons,
-            objective_fn
+            objective_fn,
+            batch_size,
+            optimizer_class,
+            optimizer_hyperparams,
+            n_epochs,
+            verbose=True
         )
         return np.mean(scores)
     
@@ -194,13 +291,17 @@ def main():
     # Make objective
     objective = make_objective(
         modeling_config.model_class,
-        modeling_config.hyperparam_space,
+        modeling_config.model_hyperparam_space,
         modeling_data,
         features,
         target,
         modeling_config.val_seasons, 
-        modeling_config.n_train_seasons_suggestion,
-        modeling_config.objective_fn
+        modeling_config.n_train_seasons_space,
+        modeling_config.objective_fn,
+        modeling_config.batch_size,
+        modeling_config.optimizer_class,
+        modeling_config.optimizer_hyperparam_space,
+        modeling_config.n_epochs
     )
     
     # Make study

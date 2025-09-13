@@ -3,7 +3,7 @@ from lightgbm import LGBMRegressor
 import os
 
 model_class = LGBMRegressor
-hyperparam_space = {
+model_hyperparam_space = {
     "n_jobs": os.cpu_count() // 2,
     "objective": "regression",
     "metric": "rmse",
@@ -30,6 +30,8 @@ hyperparam_space = {
 
 objective_fn = root_mean_squared_error
 val_seasons = [2020, 2021, 2022, 2023, 2024]
-study_name = "lgbm_study"
+n_train_seasons_space = ("int", {"low" : 1, "high" : 40}) # Number of training seasons to use
 
-n_train_seasons_suggestion = ("int", {"low" : 1, "high" : 50}) # Number of training seasons to use
+# Names
+study_name = "lgbm_study"
+model_filename = "lgbm.joblib"
