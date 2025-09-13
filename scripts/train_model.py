@@ -156,7 +156,10 @@ def main(args):
     all_hyperparams = study.best_trial.params
     
     # Extract best model hyperperams from study
-    model_hyperparams = {key : all_hyperparams[key] for key in modeling_config.model_hyperparam_space.keys()}
+    model_hyperparams = {
+        key: all_hyperparams[key] if key in all_hyperparams else val
+        for key, val in modeling_config.model_hyperparam_space.items()
+    }
     
     # Load in data, get training data
     modeling_data, features, target = get_prev_0_modeling_data()
@@ -181,7 +184,10 @@ def main(args):
     else:
         # For torch-style modeling setups
         # Extract optimizer hyperparams from study
-        optimizer_hyperparams = {key : all_hyperparams[key] for key in modeling_config.optimizer_hyperparam_space.keys()}
+        optimizer_hyperparams = {
+            key : all_hyperparams[key] if key in all_hyperparams else val 
+            for key, val in modeling_config.optimizer_hyperparam_space.items()
+        }
         
         # Train model
         model = train_torch(
