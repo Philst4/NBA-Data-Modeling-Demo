@@ -171,7 +171,7 @@ def backtest(
     
         metrics['mae'].append(mean_absolute_error(y_val, y_val_preds))
         metrics['rmse'].append(root_mean_squared_error(y_val, y_val_preds))
-        metrics['r2_'].append(r2_score(y_val, y_val_preds))
+        metrics['r2'].append(r2_score(y_val, y_val_preds))
         metrics['acc'].append(acc(y_val, y_val_preds))
         metrics['roc_auc'].append(
             roc_auc_score(
