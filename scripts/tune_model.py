@@ -31,6 +31,34 @@ from train_model import (
     predict_torch
 )
 
+def sample_hyperparam(trial, name, specs):
+    """
+    pass
+    """
+    if not isinstance(specs, tuple):
+        # For non-tunable
+        return specs
+    else:
+        # For tunable
+        ptype = specs[0]
+        if ptype == "float":
+            return trial.suggest_float(name, **specs[1])
+        elif ptype == "int":
+            return trial.suggest_int(name, **specs[1])
+        elif ptype == "categorical":
+            return trial.suggest_categorical(name, **specs[1]) 
+        else:
+            raise ValueError(f"Unknown param type: {ptype}")
+
+def sample_hyperparams(trial, hyperparam_space):
+    """
+    Dynamically samples hyperparameters optuna-style, given sampling space.
+    """
+    hyperparams = {}
+    for name, specs in hyperparam_space.items():
+        hyperparams[name] = sample_hyperparam(trial, name, specs)
+    return hyperparams
+
 def acc(y, y_preds):
     return ((y > 0) == (y_preds > 0)).astype(int).mean()
 
@@ -50,17 +78,20 @@ def backtest(
     verbose=True
 ):
     """
-    Accumulates objective scores of models trained/validated on specified train-val splits.
+    Accumulates metrics of models trained/validated on specified train-val splits.
     """
     scores = []
     
-    # For verbose
-    maes = []
-    rmses = []
-    r2_scores = []
-    accs = []
-    roc_auc_scores = []
-    times = []
+    # Dictionary to store metrics
+    metrics = {
+        "mae" : [],
+        "rmse" : [],
+        "r2" : [],
+        "acc" : [],
+        "roc_auc" : [],
+        "time" : [],
+        "score" : [], # What given objective function calculates
+    }
     
     for i, val_season in enumerate(val_seasons):
         
@@ -134,71 +165,43 @@ def backtest(
             
         
         # Evaluate the model on the validation data
-        scores.append(score)
+        metrics['score'].append(score)
         
         iter_end_time = time()
     
-        maes.append(mean_absolute_error(y_val, y_val_preds))
-        rmses.append(root_mean_squared_error(y_val, y_val_preds))
-        r2_scores.append(r2_score(y_val, y_val_preds))
-        accs.append(acc(y_val, y_val_preds))
-        roc_auc_scores.append(
+        metrics['mae'].append(mean_absolute_error(y_val, y_val_preds))
+        metrics['rmse'].append(root_mean_squared_error(y_val, y_val_preds))
+        metrics['r2_'].append(r2_score(y_val, y_val_preds))
+        metrics['acc'].append(acc(y_val, y_val_preds))
+        metrics['roc_auc'].append(
             roc_auc_score(
                 (y_val > 0).astype(int), 
                 y_val_preds
             )
         )
-        times.append(iter_end_time - iter_start_time)
+        metrics['time'].append(iter_end_time - iter_start_time)
         
         if verbose:
             # Print metrics
-            print(f" -> MAE: {maes[-1]:.3f}")
-            print(f" -> RMSE: {rmses[-1]:.3f}")
-            print(f" -> R^2 Score: {r2_scores[-1]:.3f}")
-            print(f" -> Accuracy: {accs[-1]:.3f}")
-            print(f" -> ROC AUC Score: {roc_auc_scores[-1]:.3f}")
-            print(f" -> Time to fit: {times[-1]:3f} seconds")
+            print(f" -> MAE: {metrics['mae'][-1]:.3f}")
+            print(f" -> RMSE: {metrics['rmse'][-1]:.3f}")
+            print(f" -> R^2 Score: {metrics['r2'][-1]:.3f}")
+            print(f" -> Accuracy: {metrics['acc'][-1]:.3f}")
+            print(f" -> ROC AUC Score: {metrics['roc_auc'][-1]:.3f}")
+            print(f" -> Time to fit: {metrics['time'][-1]:3f} seconds")
             
     
     if verbose:
         # Print overall metrics
         print(f"\n * Average Overall Metrics:")
-        print(f" -> MAE: {np.mean(maes):.3f}")
-        print(f" -> RMSE: {np.mean(rmses):.3f}")
-        print(f" -> R^2 Score: {np.mean(r2_scores):.3f}")
-        print(f" -> Accuracy: {np.mean(accs):.3f}")
-        print(f" -> ROC AUC Score: {np.mean(roc_auc_scores):.3f}")
-        print(f" -> Time to fit: {np.mean(times):3f} seconds")
+        print(f" -> MAE: {np.mean(metrics['mae']):.3f}")
+        print(f" -> RMSE: {np.mean(metrics['rmse']):.3f}")
+        print(f" -> R^2 Score: {np.mean(metrics['r2']):.3f}")
+        print(f" -> Accuracy: {np.mean(metrics['acc']):.3f}")
+        print(f" -> ROC AUC Score: {np.mean(metrics['roc_auc']):.3f}")
+        print(f" -> Time to fit: {np.mean(metrics['time']):3f} seconds")
          
-    return scores
-
-def sample_hyperparam(trial, name, specs):
-    """
-    pass
-    """
-    if not isinstance(specs, tuple):
-        # For non-tunable
-        return specs
-    else:
-        # For tunable
-        ptype = specs[0]
-        if ptype == "float":
-            return trial.suggest_float(name, **specs[1])
-        elif ptype == "int":
-            return trial.suggest_int(name, **specs[1])
-        elif ptype == "categorical":
-            return trial.suggest_categorical(name, **specs[1]) 
-        else:
-            raise ValueError(f"Unknown param type: {ptype}")
-
-def sample_hyperparams(trial, hyperparam_space):
-    """
-    Dynamically samples hyperparameters optuna-style, given sampling space.
-    """
-    hyperparams = {}
-    for name, specs in hyperparam_space.items():
-        hyperparams[name] = sample_hyperparam(trial, name, specs)
-    return hyperparams
+    return metrics
 
 def make_objective(
     model_class, 
@@ -242,7 +245,7 @@ def make_objective(
             optimizer_hyperparams = None
             
         # Backtest the model
-        scores = backtest(
+        metrics = backtest(
             model_class, 
             model_hyperparams, 
             modeling_data, 
@@ -257,7 +260,12 @@ def make_objective(
             n_epochs,
             verbose=True
         )
-        return np.mean(scores)
+        
+        # Log metrics as user attributes
+        trial.set_user_attr("metrics", metrics)
+        
+        # Return objective function's score
+        return np.mean(metrics['scores'])
     
     return objective
     
