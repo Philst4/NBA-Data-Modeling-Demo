@@ -265,7 +265,7 @@ def make_objective(
         trial.set_user_attr("metrics", metrics)
         
         # Return objective function's score
-        return np.mean(metrics['scores'])
+        return np.mean(metrics['score'])
     
     return objective
     
