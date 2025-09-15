@@ -157,7 +157,7 @@ def backtest(
                 batch_size
             )
             y_val = torch.tensor(val_data[[target]].values)
-            score = objective_fn(y_val_preds, y_val).numpy()
+            score = objective_fn(y_val_preds, y_val).item()
             
             # Convert to numpy for next part
             y_val_preds = y_val_preds.numpy()

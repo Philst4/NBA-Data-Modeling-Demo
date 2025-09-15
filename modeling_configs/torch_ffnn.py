@@ -95,4 +95,4 @@ n_epochs = 1
 
 # Names
 study_name = "torch_ffnn_study"
-model_filename = "torch_ffnn.pth"
+model_filename = "torch_ffnn_model.pth"
