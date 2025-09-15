@@ -86,7 +86,7 @@ objective_fn = rmse_torch
 val_seasons = [2020, 2021, 2022, 2023, 2024]
 
 n_train_seasons_space = ("int", {"low" : 1, "high" : 10})
-batch_size = 128
+batch_size = 512
 optimizer_class = torch.optim.Adam
 optimizer_hyperparam_space = {
     "lr" : ("float", {"low" : 1e-4, "high" : 1e-2, "log" : True})
