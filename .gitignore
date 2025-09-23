@@ -1,16 +1,13 @@
 .DS_Store
-
-# Python
 *.pyc
 *.pyo
 __pycache__/
 *.pyd
 
 # Virtual environment
-.venv/
-.new_venv/
+*.venv
 
-# Data/databases
+# Data + databases
 /data/
 *.db
 
@@ -18,21 +15,8 @@ __pycache__/
 *.joblib
 *.pth
 
-# Logs
-/*logs
-
-# Everything to ignore from src
-/src/*models
-/src/dataloading.py
-/src/training.py
-
-# Everything to ignore from scripts
-/scripts/check_training_logs.py
-/scripts/save_from_ckpt.py
-
 # Other to ignore (for now)
-#Tests
 tests/
+
 # Ignore web app for now
-app/
-package.json
+app.py

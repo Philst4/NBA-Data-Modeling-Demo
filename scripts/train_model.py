@@ -13,126 +13,20 @@ import numpy as np
 import optuna
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
-from tqdm import tqdm
 
 # Internal imports
-from src.utils import (
+from src.model.config_mgmt import (
     load_modeling_config,
-    get_prev_0_modeling_data
 )
-from src.gameset import Gameset
 
+from src.data.io import (
+    get_modeling_data
+)
 
-def train_sklearn(
-    model_class,
-    model_hyperparams,
-    training_data,
-    features, 
-    target
-):
-     
-    assert len(training_data) > 0, f"No training data."
-        
-    # Get features/target
-    X_tr = training_data[features]
-    y_tr = training_data[target]
-    
-    # Instantiate model
-    model = model_class(**model_hyperparams)
-        
-    # Fit the model on the training data
-    model.fit(X_tr, y_tr)
-    
-    # Return model
-    return model
-
-def train_torch(
-    model_class,
-    model_hyperparams,
-    training_data,
-    features, 
-    target,
-    batch_size, # For Initializing DataLoader 
-    optimizer_class, 
-    optimizer_hyperparams,
-    objective_fn, # For calculating loss/stepping w/ optimizer
-    n_epochs, # How many passes over entire dataset to give model!
-    
-):  
-    # Initialize DataLoader
-    trainset = Gameset(training_data, features, [target])
-    trainloader = DataLoader(trainset, batch_size=batch_size, shuffle=True)
-    
-    # Initialize model
-    model = model_class(
-        input_dim=trainset.get_input_dim(),
-        output_dim=trainset.get_output_dim(),      
-        **model_hyperparams
-    )
-    
-    # Initialize optimizer
-    optimizer = optimizer_class(params=model.parameters(), **optimizer_hyperparams)
-
-    # Iteratively train model!
-    for epoch in range(n_epochs):
-        
-        # Iterate over batch
-        for batch_idx, (X, y) in enumerate(tqdm(trainloader, desc=f" -- Epoch {epoch + 1}/{n_epochs} -- ")):
-            # Move tensors to proper device
-            pass
-        
-            # Forward pass
-            y_preds = model(X)
-            loss = objective_fn(y_preds, y) # AKA loss_fn
-            
-            # Backward pass
-            optimizer.zero_grad()
-            loss.backward()
-            
-            # Update weights
-            optimizer.step()
-            
-            # Print progress?
-            pass
-
-    # Return trained model instance
-    return model
-
-def predict_torch(
-    model,
-    data,
-    features,
-    batch_size,
-    w_unique_ids=False,
-):
-    
-    # Initialize DataLoader
-    gameset = Gameset(data, features, [])
-    gameloader = DataLoader(gameset, batch_size=batch_size, shuffle=False)
-    
-    # Initialize list to hold all predictions
-    all_y_preds = []
-    
-    with torch.no_grad():
-        # Iterate over batch
-        for batch_idx, (X, _) in enumerate(gameloader):
-            
-            # Move tensors to proper device
-            pass
-        
-            # Forward pass
-            y_preds = model(X)
-            
-            # Add to list of results
-            all_y_preds.append(y_preds)
-    
-    # Convert to numpy
-    all_y_preds = torch.cat(all_y_preds, dim=0)
-    
-    # Return
-    return all_y_preds
-        
+from src.model.training import (
+    train_sklearn,
+    train_torch,
+)       
 
 def main(args):
     # From base config TODO
@@ -162,7 +56,7 @@ def main(args):
     }
     
     # Load in data, get training data
-    modeling_data, features, target = get_prev_0_modeling_data()
+    modeling_data, features, target = get_modeling_data()
     last_train_season = args.last_train_season
     n_train_seasons = all_hyperparams['n_train_seasons']
     train_condn1 = modeling_data['SEASON_ID'] - 20_000 <= last_train_season

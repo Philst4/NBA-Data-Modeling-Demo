@@ -11,12 +11,12 @@ import pandas as pd
 import sqlite3
 
 # Local imports
-from src.utils import (
+from src.data.io import (
     read_from_csv,
     save_to_db
 )
 
-from src.cleaning import (
+from src.data.cleaning import (
     get_summary_stats,
     drop_cols,
     mirror,

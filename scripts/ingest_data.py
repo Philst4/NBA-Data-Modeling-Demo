@@ -10,12 +10,12 @@ import yaml
 import pandas as pd
 
 # Local imports
-from src.utils import (
+from src.data.io import (
     save_as_csv,
     read_from_csv
 )
 
-from src.ingesting import (
+from src.data.ingesting import (
     ingestion_fns
 )
 

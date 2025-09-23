@@ -10,7 +10,7 @@ import yaml
 import sqlite3
 
 # Internal imports
-from src.utils import check_db
+from src.data.checks import check_db
 
 if __name__ == '__main__':
     # Read configuration

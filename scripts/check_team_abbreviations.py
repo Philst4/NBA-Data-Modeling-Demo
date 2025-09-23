@@ -8,7 +8,7 @@ sys.path.append(project_root)
 # External imports
 
 # Internal imports
-from src.utils import (
+from src.data.io import (
     query_db
 )
 
@@ -19,7 +19,7 @@ if __name__ == "__main__":
 
     # Extract from config (revisit)
     db_path = os.path.join("data", "clean", "my_database.db")
-    query = f"""SELECT TEAM_ABBREVIATION 
+    query = f"""SELECT TEAM_NAME, TEAM_ABBREVIATION 
     FROM team_metadata 
     WHERE SEASON_ID = {season_id}
     """
@@ -29,4 +29,4 @@ if __name__ == "__main__":
         query=query
     )
     
-    print(team_abbreviations['TEAM_ABBREVIATION'].sort_values(ignore_index=True))
+    print(team_abbreviations.sort_values(by=['TEAM_ABBREVIATION'], ignore_index=True))
