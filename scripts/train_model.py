@@ -33,11 +33,20 @@ def main(args):
     # Read configuration
     with open('config.yaml', 'r') as file:
         config = yaml.safe_load(file)
+    CLEAN_DATA_DIR = config['clean_data_dir']
+    DB_NAME = config['db_name']
+    DB_PATH = os.path.join(CLEAN_DATA_DIR, DB_NAME)
+    MODELING_CONFIG_DIR = config['modeling_config_dir']
     OPTUNA_STORAGE = config["optuna_storage"]
     MODEL_STORAGE = config['model_storage']
     
-    # Read in modeling config
-    modeling_config = load_modeling_config(args.modeling_config)
+    # Read modeling config
+    modeling_config = load_modeling_config(
+        os.path.join(
+            MODELING_CONFIG_DIR,
+            args.modeling_config
+        )
+    )
     
     # Load in study
     study = optuna.load_study(
@@ -60,7 +69,7 @@ def main(args):
     }
     
     # Load in data, get training data
-    modeling_data, features, target = get_modeling_data()
+    modeling_data, features, target = get_modeling_data(DB_PATH)
     last_train_season = args.last_train_season
     n_train_seasons = all_hyperparams['n_train_seasons']
     train_condn1 = modeling_data['SEASON_ID'] - 20_000 <= last_train_season
@@ -114,7 +123,7 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--modeling_config", type=str, default="modeling_configs/lasso.py", help="Modeling config")
+    parser.add_argument("--modeling_config", type=str, default="lasso.py", help="Modeling config")
     parser.add_argument("--last_train_season", type=int, default=2024, help="Season to train the model up to (inclusive).")
     args = parser.parse_args()
     main(args)

@@ -1,0 +1,69 @@
+import sys
+import os
+import argparse
+
+# Add the project root to the Python path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(project_root)
+
+# External imports
+import yaml
+
+# Internal imports
+from src.data.io import (
+    query_db,
+    save_to_db
+)
+from src.data.processing import (
+    get_normalized_by_season,
+    get_rolling_avgs
+)
+
+def main(args):
+    # Read configuration
+    with open('config.yaml', 'r') as file:
+        config = yaml.safe_load(file)
+    CLEAN_DIR = config['clean_data_dir']    
+    DB_NAME = config['db_name']
+    DB_PATH = os.path.join(CLEAN_DIR, DB_NAME)
+    METADATA_TABLE_NAME = config['metadata']['games']['table_name']
+    MAIN_TABLE_NAME = config['main_table_name']
+
+    game_metadata = query_db(DB_PATH, f"SELECT * from {METADATA_TABLE_NAME}")
+    game_data = query_db(DB_PATH, f"SELECT * from {MAIN_TABLE_NAME}")
+    
+    # Normalize the game data
+    if args.normalize:
+        game_data = get_normalized_by_season(
+            game_data=game_data,
+            game_metadata=game_metadata,
+        )
+    
+    # Get rolling averages
+    game_data_rolling_avgs = get_rolling_avgs(
+        game_data=game_data,
+        game_metadata=game_metadata,
+        windows=[args.window]
+    )
+    
+    # Save to database
+    suffix = "_"
+    if args.normalize:
+        suffix += "norm_"
+    suffix += "prev_" + str(args.window)
+    
+    save_to_db(
+        game_data_rolling_avgs, 
+        CLEAN_DIR,
+        DB_NAME,
+        MAIN_TABLE_NAME + suffix
+    )
+    
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--window', type=int, default=0, help="Window to make rolling averages over")
+    parser.add_argument('--normalize', type=bool, default=True, help="Whether or not the features should use normalized data (wrt season)")
+
+    args = parser.parse_args()
+    main(args)
+    

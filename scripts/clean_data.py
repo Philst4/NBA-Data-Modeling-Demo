@@ -37,7 +37,7 @@ if __name__ == "__main__":
     DB_NAME = config['db_name']
     
     # Loop will start here
-    MAIN_TABLE_NAME = 'game_data'
+    MAIN_TABLE_NAME = config['main_table_name']
     SUMMARY_TABLE_NAME = MAIN_TABLE_NAME + '_summary'
     cols_to_drop = [
         'SEASON_ID',

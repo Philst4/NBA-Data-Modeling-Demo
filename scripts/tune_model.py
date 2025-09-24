@@ -30,11 +30,15 @@ def main():
     # Read configuration
     with open('config.yaml', 'r') as file:
         config = yaml.safe_load(file)
-    optuna_storage = config["optuna_storage"]
+    CLEAN_DIR = config['clean_data_dir']    
+    DB_NAME = config['db_name']
+    DB_PATH = os.path.join(CLEAN_DIR, DB_NAME)
+    MODELING_CONFIG_DIR = config['modeling_config_dir']
+    OPTUNA_STORAGE = config["optuna_storage"]
     
     # Create argparser
     parser = argparse.ArgumentParser()
-    parser.add_argument("--modeling_config", type=str, default="modeling_configs/lasso.py")
+    parser.add_argument("--modeling_config", type=str, default="lasso.py")
     parser.add_argument("--n_trials", type=int, default=10)
     parser.add_argument("--n_jobs", type=int, default=1, help="Used to parallelize building models ATM.")
         
@@ -45,10 +49,15 @@ def main():
     n_jobs = args.n_jobs
         
     # Read modeling config
-    modeling_config = load_modeling_config(args.modeling_config)
+    modeling_config = load_modeling_config(
+        os.path.join(
+            MODELING_CONFIG_DIR,
+            args.modeling_config
+        )
+    )
     
     # Get modeling data
-    modeling_data, features, target = get_modeling_data()
+    modeling_data, features, target = get_modeling_data(db_path=DB_PATH)
     
     # Make objective
     objective = make_backtest_objective(
@@ -70,7 +79,7 @@ def main():
     study = optuna.create_study(
         study_name=modeling_config.study_name,
         direction="minimize",
-        storage=optuna_storage,
+        storage=OPTUNA_STORAGE,
         load_if_exists=True
     )
     

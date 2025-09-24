@@ -16,7 +16,4 @@ __pycache__/
 *.pth
 
 # Other to ignore (for now)
-tests/
-
-# Ignore web app for now
 app.py

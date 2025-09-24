@@ -68,9 +68,9 @@ def query_db(db_path : str, query : str) -> pd.DataFrame:
     return dataframe
 
 def get_modeling_data(
-    db_path="data/clean/my_database.db",
+    db_path,
     date=None,
-    windows=[0]
+    window=0
     ):
     """
     Returns the modeling data, feature names, target name
@@ -79,30 +79,19 @@ def get_modeling_data(
     if not date:
         game_metadata = query_db(db_path, "SELECT * from game_metadata")
         game_data = query_db(db_path, f"SELECT * from game_data")
+        game_data_prev = query_db(db_path, f"SELECT * from game_data_norm_prev_{window}")
     else:
         # Find the season of specified date
         game_metadata = query_db(db_path, f"SELECT * from game_metadata WHERE GAME_DATE is {date}")
         game_data = query_db(db_path, f"SELECT * from game_data WHERE game_date is {date}")
-    
-    # Normalize the game data
-    normalized_game_data = get_normalized_by_season(
-        game_data=game_data,
-        game_metadata=game_metadata,
-    )
-    
-    # Get rolling averages
-    normalized_game_data_rolling_avgs = get_rolling_avgs(
-        game_data=normalized_game_data,
-        game_metadata=game_metadata,
-        windows=windows
-    )
+        game_data_prev = query_db(db_path, f"SELECT * from game_data_norm_prev_{window}")
     
     # Merge to get modeling data
-    modeling_data = pd.merge(game_metadata, normalized_game_data_rolling_avgs, on='UNIQUE_ID')
-    modeling_data = pd.merge(modeling_data, normalized_game_data[['UNIQUE_ID', 'IS_HOME_for', 'IS_HOME_ag', 'PLUS_MINUS_for']], on='UNIQUE_ID')
+    modeling_data = pd.merge(game_metadata, game_data_prev, on='UNIQUE_ID')
+    modeling_data = pd.merge(modeling_data, game_data[['UNIQUE_ID', 'IS_HOME_for', 'IS_HOME_ag', 'PLUS_MINUS_for']], on='UNIQUE_ID')
     
     # Get features + target
-    rolling_avg_feature_names = [col for col in list(normalized_game_data_rolling_avgs.columns) if col != 'UNIQUE_ID']
+    rolling_avg_feature_names = [col for col in list(game_data_prev.columns) if col != 'UNIQUE_ID']
     features = ['IS_HOME_for', 'IS_HOME_ag'] + rolling_avg_feature_names
     target = 'PLUS_MINUS_for'
     
