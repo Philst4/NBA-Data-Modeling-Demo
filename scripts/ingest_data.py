@@ -16,7 +16,7 @@ from src.data.io import (
 )
 
 from src.data.ingesting import (
-    ingestion_fns
+    ingest_from_leaguegamefinder
 )
 
 if __name__ == "__main__":
@@ -24,16 +24,12 @@ if __name__ == "__main__":
     print("--- RUNNING DATA INGESTION SCRIPT ---")
     
     # (0) Read configuration
-    with open('configs/old_config.yaml', 'r') as file:
-        config = yaml.safe_load(file)
-    RAW_DIR = config['raw_dir']
-    RAW_FILE_NAME = config['raw_file_name']
+    RAW_DIR = "data/raw/"
+    RAW_FILE_NAME = "raw.csv"
     RAW_FILE_PATH = os.path.join(RAW_DIR, RAW_FILE_NAME)
     
-    ingest_config = config['ingest_data']
     # Loop starts here
-    curr_endpoint = ingest_config['endpoints'][0]
-    ingestion_fn = ingestion_fns[curr_endpoint] # ingestion function
+    ingestion_fn = ingest_from_leaguegamefinder # ingestion function
     
     # (1) Check if raw exists, and
     # (2) Read in relevant data from NBA API

@@ -2,8 +2,6 @@ from sklearn.metrics import root_mean_squared_error
 import torch
 import torch.nn as nn
 
-from torch.utils.data import Dataset, DataLoader
-
 #### MODEL ####
 class FFNN(nn.Module):
     """
@@ -86,7 +84,7 @@ objective_fn = rmse_torch
 val_seasons = [2020, 2021, 2022, 2023, 2024]
 
 n_train_seasons_space = ("int", {"low" : 1, "high" : 10})
-batch_size = 512
+batch_size = 1024
 optimizer_class = torch.optim.Adam
 optimizer_hyperparam_space = {
     "lr" : ("float", {"low" : 1e-4, "high" : 1e-2, "log" : True})

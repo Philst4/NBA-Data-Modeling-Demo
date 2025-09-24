@@ -14,9 +14,9 @@ from src.data.checks import check_db
 
 if __name__ == '__main__':
     # Read configuration
-    with open('configs/old_config.yaml', 'r') as file:
+    with open('config.yaml', 'r') as file:
         config = yaml.safe_load(file)
-    CLEAN_DIR = config['clean_dir']
+    CLEAN_DIR = config['clean_data_dir']
     DB_NAME = config['db_name']
     DB_PATH = os.path.join(CLEAN_DIR, DB_NAME)
     

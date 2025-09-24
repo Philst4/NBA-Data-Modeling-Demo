@@ -7,6 +7,7 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(project_root)
 
 # External imports
+import yaml
 import optuna
 
 # Internal imports
@@ -26,8 +27,10 @@ def main():
     and tunes according to that objective function.
     """
     
-    # From base config TODO
-    optuna_storage = "sqlite:///optuna_studies.db"
+    # Read configuration
+    with open('config.yaml', 'r') as file:
+        config = yaml.safe_load(file)
+    optuna_storage = config["optuna_storage"]
     
     # Create argparser
     parser = argparse.ArgumentParser()

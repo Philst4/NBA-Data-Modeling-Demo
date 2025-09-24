@@ -16,4 +16,6 @@ dependencies:
   - torchvision
   - optuna
   - scikit-learn
+  - lightgbm
+  - plotly
 prefix: /opt/anaconda3/envs/nba

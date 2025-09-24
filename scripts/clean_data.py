@@ -19,36 +19,38 @@ from src.data.io import (
 from src.data.cleaning import (
     get_summary_stats,
     drop_cols,
+    fill_plus_minus,
     mirror,
     deal_w_NaNs,
 )
-
-# Used to fill 'PLUS_MINUS' N/A's
-def fill_plus_minus(games : pd.DataFrame) -> None:
-    print(f" * Filling 'PLUS_MINUS' ...")
-    games.loc[:, 'PLUS_MINUS_for'] = games.loc[:, 'PTS_for'].astype(int) - games.loc[:, 'PTS_ag'].astype(int)
-    games.loc[:, 'PLUS_MINUS_ag'] = -games.loc[:, 'PLUS_MINUS_for']
-    return
-
 
 if __name__ == "__main__":
     print("--- RUNNING DATA ETL SCRIPT ---")
     
     # (0) Read in configuration
-    with open('configs/old_config.yaml', 'r') as file:
+    with open('config.yaml', 'r') as file:
         config = yaml.safe_load(file)
-    RAW_DIR = config['raw_dir']
-    RAW_FILE_NAME = config['raw_file_name']
+    RAW_DIR = config['raw_data_dir']
+    RAW_FILE_NAME = config['raw_filename']
     RAW_FILE_PATH = os.path.join(RAW_DIR, RAW_FILE_NAME)
-    CLEAN_DIR = config['clean_dir']
+    CLEAN_DIR = config['clean_data_dir']
     DB_NAME = config['db_name']
     
-    data_config = config['data']
     # Loop will start here
-    curr_table = data_config[0]
-    MAIN_TABLE_NAME = curr_table['table_name']
+    MAIN_TABLE_NAME = 'game_data'
     SUMMARY_TABLE_NAME = MAIN_TABLE_NAME + '_summary'
-    cols_to_drop = curr_table['cols_to_drop']
+    cols_to_drop = [
+        'SEASON_ID',
+        'GAME_ID',
+        'TEAM_ABBREVIATION',
+        'TEAM_NAME',
+        'GAME_DATE',
+        'MATCHUP',
+        'WL',
+        'FT_PCT', 
+        'FG_PCT', 
+        'FG3_PCT',
+        ]
     
     # Make sure we don't lose info needed for the program to run correctly
     NEEDED_FOR_SUMMARY = ('SEASON_ID')

@@ -1,3 +1,4 @@
+from joblib import load
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -39,3 +40,31 @@ def predict_torch(
     
     # Return
     return all_y_preds
+
+def predict_on_date(date : str):
+    """
+    Takes in a date and makes a prediction with the model.
+    """    
+
+    # Load model
+    model = load("model.joblib")
+
+    # Load in data
+    pass
+    data = None
+    features = None
+    batch_size = None
+    w_unique_ids = None
+    
+    # Use model to make predictions with data
+    if not isinstance(model, nn):
+        pass
+    else:
+        # For torch model
+        preds = predict_torch(
+            model, 
+            data,
+            features,
+            batch_size,
+            w_unique_ids
+        )

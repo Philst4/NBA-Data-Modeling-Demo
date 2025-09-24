@@ -8,6 +8,7 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(project_root)
 
 # External imports
+import yaml
 import pandas as pd
 import numpy as np
 import optuna
@@ -29,15 +30,18 @@ from src.model.training import (
 )       
 
 def main(args):
-    # From base config TODO
-    optuna_storage = "sqlite:///optuna_studies.db"
+    # Read configuration
+    with open('config.yaml', 'r') as file:
+        config = yaml.safe_load(file)
+    OPTUNA_STORAGE = config["optuna_storage"]
+    MODEL_STORAGE = config['model_storage']
     
     # Read in modeling config
     modeling_config = load_modeling_config(args.modeling_config)
     
     # Load in study
     study = optuna.load_study(
-        storage=optuna_storage,
+        storage=OPTUNA_STORAGE,
         study_name=modeling_config.study_name
     )
     
@@ -97,12 +101,16 @@ def main(args):
             modeling_config.n_epochs
         )
     
+    # Ensure storage path exists
+    os.makedirs(MODEL_STORAGE, exist_ok=True)
+    
     # Save the model
-    print(f"Saving model to '{modeling_config.model_filename}'")
+    model_path = os.path.join(MODEL_STORAGE, modeling_config.model_filename)
+    print(f"Saving model to '{model_path}'")
     if not isinstance(model, nn.Module):
-        dump(model, modeling_config.model_filename)
+        dump(model, model_path)
     else:
-        torch.save(model, modeling_config.model_filename)
+        torch.save(model, model_path)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

@@ -10,6 +10,7 @@ sys.path.append(project_root)
 # External imports
 import optuna
 import optuna.visualization as vis
+import yaml
 
 def visualize_study(study):
 
@@ -20,13 +21,15 @@ def visualize_study(study):
     vis.plot_slice(study).show()
 
 def main(args):
-    # What we need
-    optuna_storage_path = "sqlite:///optuna_studies.db"
+    # Read configuration
+    with open('config.yaml', 'r') as file:
+        config = yaml.safe_load(file)
+    OPTUNA_STORAGE = config["optuna_storage"]
     
     # Load study into memory
     study = optuna.load_study(
         study_name=args.study_name, 
-        storage=optuna_storage_path
+        storage=OPTUNA_STORAGE
     )
     
     visualize_study(study)

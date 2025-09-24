@@ -26,12 +26,12 @@ if __name__ == "__main__":
     print("--- RUNNING METADATA ETL SCRIPT --- ")
     
     # (0) Read in configuration
-    with open('configs/old_config.yaml', 'r') as file:
+    with open('config.yaml', 'r') as file:
         config = yaml.safe_load(file)
-    RAW_DIR = config['raw_dir']
-    RAW_FILE_NAME = config['raw_file_name']
+    RAW_DIR = config['raw_data_dir']
+    RAW_FILE_NAME = config['raw_filename']
     RAW_FILE_PATH = os.path.join(RAW_DIR, RAW_FILE_NAME)
-    CLEAN_DIR = config['clean_dir']
+    CLEAN_DIR = config['clean_data_dir']
     DB_NAME = config['db_name']
     
     metadata_config = config['metadata']

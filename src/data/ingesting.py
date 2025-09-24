@@ -9,12 +9,9 @@ sys.path.append(project_root)
 
 # External imports
 from nba_api.stats.endpoints import (
-    leaguegamefinder,
-    shotchartdetail,
+    leaguegamefinder
 )
-from nba_api.stats.static import (
-    teams
-)
+
 import pandas as pd
 from typing import Optional
 
@@ -100,11 +97,6 @@ def ingest_from_leaguegamefinder(
     else:
         new_games = pd.concat(season_dfs)
         return new_games
-
-# Dictionary of ingestion functions
-ingestion_fns = {
-    'leaguegamefinder' : ingest_from_leaguegamefinder
-}
 
 
     

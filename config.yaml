@@ -1,0 +1,39 @@
+
+# For raw data
+raw_data_dir : "data/raw/"
+raw_filename : "raw.csv"
+
+# For main database
+clean_data_dir : "data/clean/"
+db_name : "my_database.db"
+
+metadata:
+  games :
+    table_name : 'game_metadata'
+    columns : 
+      - UNIQUE_ID
+      - SEASON_ID
+      - IS_HOME
+      - GAME_ID
+      - GAME_DATE
+      - MATCHUP
+      - WL
+      - TEAM_ID
+      - TEAM_ABBREVIATION
+
+  teams : 
+    table_name : 'team_metadata'
+    columns : 
+      - SEASON_ID
+      - TEAM_ID
+      - TEAM_ABBREVIATION
+      - TEAM_NAME
+  
+# For optuna db
+optuna_storage : "sqlite:///optuna_studies.db"
+
+# Model storage
+model_storage : "models/" # Just a directory
+
+
+

@@ -41,6 +41,13 @@ def add_cols(games : pd.DataFrame, cols_to_add : list[str], dependencies : list[
         map = maps[i]
         games[new_col] = games[cols_depending_on].map(map)
 
+# Used to fill 'PLUS_MINUS' N/A's
+def fill_plus_minus(games : pd.DataFrame) -> None:
+    print(f" * Filling 'PLUS_MINUS' ...")
+    games.loc[:, 'PLUS_MINUS_for'] = games.loc[:, 'PTS_for'].astype(int) - games.loc[:, 'PTS_ag'].astype(int)
+    games.loc[:, 'PLUS_MINUS_ag'] = -games.loc[:, 'PLUS_MINUS_for']
+    return
+
 def mirror(
     games : pd.DataFrame, 
     cols_to_mirror=None,
