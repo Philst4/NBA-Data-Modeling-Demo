@@ -7,7 +7,6 @@ import sqlite3
 # Internal imports
 from src.data.processing import (
     get_normalized_by_season,
-    get_rolling_avgs
 )
 
 
@@ -88,7 +87,14 @@ def get_modeling_data(
     
     # Merge to get modeling data
     modeling_data = pd.merge(game_metadata, game_data_prev, on='UNIQUE_ID')
-    modeling_data = pd.merge(modeling_data, game_data[['UNIQUE_ID', 'IS_HOME_for', 'IS_HOME_ag', 'PLUS_MINUS_for']], on='UNIQUE_ID')
+    modeling_data = pd.merge(modeling_data, game_data[['UNIQUE_ID', 'IS_HOME_for', 'IS_HOME_ag']], on='UNIQUE_ID')
+    
+    # Add the normalized target to modeling data
+    normalized_target = get_normalized_by_season(
+        game_data[['UNIQUE_ID', 'PLUS_MINUS_for']],
+        game_metadata
+    )
+    modeling_data = pd.merge(modeling_data, normalized_target, on='UNIQUE_ID')
     
     # Get features + target
     rolling_avg_feature_names = [col for col in list(game_data_prev.columns) if col != 'UNIQUE_ID']
