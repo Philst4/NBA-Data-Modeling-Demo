@@ -11,15 +11,35 @@ sys.path.append(project_root)
 import optuna
 import optuna.visualization as vis
 import yaml
+import plotly.tools as tls
 
-def visualize_study(study):
+# Internal imports
+from src.utils import get_metric_quantiles_fig
 
-    # Visualize the study
-    vis.plot_optimization_history(study).show()
-    vis.plot_parallel_coordinate(study).show()
-    vis.plot_param_importances(study).show()
-    vis.plot_slice(study).show()
+def visualize_study(study, study_name=""):
 
+    # Visualize the study using optuna.vis
+    vis.plot_optimization_history(study).update_layout(
+        title=f"'{study_name}' Optimization History Plot",
+    ).show()
+    vis.plot_parallel_coordinate(study).update_layout(
+        title=f"'{study_name}' Parallel Coordinate Plot",
+    ).show()
+    vis.plot_param_importances(study).update_layout(
+        title=f"'{study_name}' Param Importances Plot",
+    ).show()
+    vis.plot_slice(study).update_layout(
+        title=f"'{study_name}' Slice Plot",
+    ).show()
+    
+    # Use plot_metric_quantiles as well
+    metric_quantiles_fig = get_metric_quantiles_fig(study, study_name=study_name)
+    
+    tls.mpl_to_plotly(metric_quantiles_fig).update_layout(
+        title=f"'{study_name}' Quantile Bands Across Metrics",
+        margin=dict(t=100)
+    ).show()
+    
 def main(args):
     # Read configuration
     with open('config.yaml', 'r') as file:
@@ -32,7 +52,7 @@ def main(args):
         storage=OPTUNA_STORAGE
     )
     
-    visualize_study(study)
+    visualize_study(study, args.study_name)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

@@ -17,6 +17,7 @@ import seaborn as sns
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
+import math
 
 #### STRING PROCESSING UTILITIES ####
 def season_int_to_str(season : int) -> str:
@@ -60,6 +61,105 @@ def rename_for_rolled_opp(col):
     elif '_for' in col:
         return col.replace('_for', '_ag_opp')
     return col + '_opp'
+
+
+#### For visualizing study ####
+def get_metric_quantiles_fig(study, study_name=""):
+    quantiles = [0.05, 0.25, 0.5, 0.75, 0.95]
+
+    # ---- collect all metrics for each trial & split ----
+    rows = []
+    for trial in study.trials:
+        metrics = trial.user_attrs.get("metrics")
+        if not metrics:
+            continue
+        n_splits = len(next(iter(metrics.values())))
+        for split in range(n_splits):
+            row = {"trial": trial.number, "split": split}
+            for metric_name, values in metrics.items():
+                row[metric_name] = values[split]
+            rows.append(row)
+
+    metrics_df = pd.DataFrame(rows)
+
+    metric_names = [c for c in metrics_df.columns if c not in ("trial", "split")]
+
+    # ---- compute quantiles across trials per split ----
+    quant_df = (
+        metrics_df
+        .groupby("split")
+        .quantile(quantiles)        # multi-index (split, quantile)
+        .unstack(level=1)           # columns become (metric, quantile)
+        .sort_index(axis=1)
+    )
+
+    best_trial = study.best_trial
+    best_metrics = best_trial.user_attrs["metrics"]
+
+    x = quant_df.index + 1  # split numbers
+
+    # ----- create a grid of subplots -----
+    n = len(metric_names)
+    ncols = 2  # adjust to taste
+    nrows = math.ceil(n / ncols)
+
+    fig, axes = plt.subplots(nrows, ncols, figsize=(6 * ncols, 4 * nrows), squeeze=False)
+
+    for i, metric_name in enumerate(metric_names):
+        ax = axes[i // ncols][i % ncols]
+
+        mean_5  = quant_df[(metric_name, 0.05)].mean()
+        mean_95 = quant_df[(metric_name, 0.95)].mean()
+        mean_25 = quant_df[(metric_name, 0.25)].mean()
+        mean_75 = quant_df[(metric_name, 0.75)].mean()
+        mean_med = quant_df[(metric_name, 0.5)].mean()
+        mean_best = np.mean(best_metrics[metric_name])
+
+        ax.fill_between(
+            x,
+            quant_df[(metric_name, 0.05)],
+            quant_df[(metric_name, 0.95)],
+            color="steelblue",
+            alpha=0.2,
+            label=f"5–95% (mean {mean_5:.3f}–{mean_95:.3f})"
+        )
+        ax.fill_between(
+            x,
+            quant_df[(metric_name, 0.25)],
+            quant_df[(metric_name, 0.75)],
+            color="steelblue",
+            alpha=0.4,
+            label=f"25–75% (mean {mean_25:.3f}–{mean_75:.3f})"
+        )
+        ax.plot(
+            x,
+            quant_df[(metric_name, 0.5)],
+            color="steelblue",
+            lw=1,
+            label=f"median (mean {mean_med:.3f})"
+        )
+        ax.plot(
+            x,
+            best_metrics[metric_name],
+            color="orange",
+            lw=1,
+            label=f"Trial {best_trial.number}; selected (mean {mean_best:.3f})"
+        )
+
+        ax.set_xlabel("Validation split number")
+        ax.set_xticks(x)
+        ax.set_ylabel(metric_name)
+        ax.set_title(f"{metric_name} quantile bands across trials for {study_name}")
+        ax.legend()
+
+    # hide any unused subplots
+    for j in range(i + 1, nrows * ncols):
+        fig.delaxes(axes[j // ncols][j % ncols])
+
+    fig.tight_layout()
+    return fig
+
+
 
 #### MODEL VISUALIZATION/EVALUATION ####    
 def visualize_regression_performance(targets : np.ndarray, preds : np.ndarray):
