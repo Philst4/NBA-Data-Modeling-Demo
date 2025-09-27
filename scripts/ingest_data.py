@@ -19,14 +19,16 @@ from src.data.ingesting import (
     ingest_from_leaguegamefinder
 )
 
-if __name__ == "__main__":
+def main():
     
     print("--- RUNNING DATA INGESTION SCRIPT ---")
     
     # (0) Read configuration
-    RAW_DIR = "data/raw/"
-    RAW_FILE_NAME = "raw.csv"
-    RAW_FILE_PATH = os.path.join(RAW_DIR, RAW_FILE_NAME)
+    with open('config.yaml', 'r') as file:
+        config = yaml.safe_load(file)
+    RAW_DATA_DIR = config['raw_data_dir']
+    RAW_FILE_NAME = config['raw_filename']
+    RAW_FILE_PATH = os.path.join(RAW_DATA_DIR, RAW_FILE_NAME)
     
     # Loop starts here
     ingestion_fn = ingest_from_leaguegamefinder # ingestion function
@@ -36,7 +38,7 @@ if __name__ == "__main__":
     if os.path.exists(RAW_FILE_PATH):
         existing_games = read_from_csv(RAW_FILE_PATH)
         last_read = existing_games['GAME_DATE'].max()
-        print(f"Existing reserve at '{RAW_FILE_PATH}' exists; last read on '{last_read}'")
+        print(f"Existing reserve at '{RAW_FILE_PATH}' exists; last game in reserve on '{last_read}'")
         print(f" Will read in all seasons with potential new games")
         new_games = ingestion_fn(start_date=last_read)
     else:
@@ -73,7 +75,12 @@ if __name__ == "__main__":
     # (7) Save file
     save_as_csv(
         df=games, 
-        write_dir=RAW_DIR,
+        write_dir=RAW_DATA_DIR,
         csv_name=RAW_FILE_NAME,
     )
     print(f"{len_total} games in the reserve at '{RAW_FILE_PATH}'")
+
+
+
+if __name__ == "__main__":
+    main()

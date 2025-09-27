@@ -14,11 +14,55 @@ def get_normalized_by_season(
     # List of columns to normalize (excluding identifiers)
     cols_to_normalize = [col for col in game_data.columns if col not in ('UNIQUE_ID', 'SEASON_ID')]
 
-# Normalize each column by SEASON_ID
+    # Normalize each column by SEASON_ID
     game_data[cols_to_normalize] = game_data.groupby('SEASON_ID')[cols_to_normalize].transform(
         lambda x: (x - x.mean()) / x.std()
     )
     return game_data.drop('SEASON_ID', axis=1)  # Return normalized data without the SEASON_ID column
+
+def get_normalized_by_season(
+    game_data: pd.DataFrame,
+    game_metadata: pd.DataFrame
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Returns
+    -------
+    game_data_normalized : pd.DataFrame
+        game_data normalized per season (z-score).
+    game_data_means_stds : pd.DataFrame
+        Per-season means and stds for each column that was normalized.
+        Columns are <stat>_mean and <stat>_std.
+    """
+    game_data = game_data.copy()
+    meta = game_metadata[['UNIQUE_ID', 'SEASON_ID']].copy()
+
+    # merge to bring SEASON_ID into game_data
+    game_data = pd.merge(meta, game_data, on='UNIQUE_ID')
+
+    cols_to_normalize = [
+        col for col in game_data.columns
+        if col not in ('UNIQUE_ID', 'SEASON_ID')
+    ]
+
+    # --- compute per-season means and stds once ---
+    agg = game_data.groupby('SEASON_ID')[cols_to_normalize].agg(['mean', 'std'])
+
+    # Flatten MultiIndex columns to "<col>_mean" / "<col>_std"
+    agg.columns = [f"{col}_{stat}" for col, stat in agg.columns]
+    game_data_means_stds = agg.reset_index()
+
+    # --- normalize using those season stats ---
+    # (x - mean) / std for each season
+    game_data[cols_to_normalize] = (
+        game_data
+        .groupby('SEASON_ID')[cols_to_normalize]
+        .transform(lambda x: (x - x.mean()) / x.std())
+    )
+
+    # drop SEASON_ID to match original output style
+    game_data_normalized = game_data.drop('SEASON_ID', axis=1)
+
+    return game_data_normalized, game_data_means_stds
 
 # Helper
 def rename_for_rolled_opp(col):

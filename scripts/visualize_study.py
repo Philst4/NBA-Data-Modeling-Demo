@@ -19,18 +19,21 @@ from src.utils import get_metric_quantiles_fig
 def visualize_study(study, study_name=""):
 
     # Visualize the study using optuna.vis
-    vis.plot_optimization_history(study).update_layout(
-        title=f"'{study_name}' Optimization History Plot",
-    ).show()
-    vis.plot_parallel_coordinate(study).update_layout(
-        title=f"'{study_name}' Parallel Coordinate Plot",
-    ).show()
-    vis.plot_param_importances(study).update_layout(
-        title=f"'{study_name}' Param Importances Plot",
-    ).show()
-    vis.plot_slice(study).update_layout(
-        title=f"'{study_name}' Slice Plot",
-    ).show()
+    try:
+        vis.plot_optimization_history(study).update_layout(
+            title=f"'{study_name}' Optimization History Plot",
+        ).show()
+        vis.plot_parallel_coordinate(study).update_layout(
+            title=f"'{study_name}' Parallel Coordinate Plot",
+        ).show()
+        vis.plot_param_importances(study).update_layout(
+            title=f"'{study_name}' Param Importances Plot",
+        ).show()
+        vis.plot_slice(study).update_layout(
+            title=f"'{study_name}' Slice Plot",
+        ).show()
+    except:
+        print("Problem with optuna.visualizations, potentially b/c they require > 1 trial.")
     
     # Use plot_metric_quantiles as well
     metric_quantiles_fig = get_metric_quantiles_fig(study, study_name=study_name)

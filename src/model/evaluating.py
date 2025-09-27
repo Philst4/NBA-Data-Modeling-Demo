@@ -17,6 +17,7 @@ from src.model.training import (
 )
 
 from src.model.predicting import (
+    predict_sklearn,
     predict_torch
 )
 
@@ -85,9 +86,12 @@ def backtest(
             )
             
             # Predict for validation set
-            X_val = val_data[features]
             y_val = val_data[target]
-            y_val_preds = model.predict(X_val)
+            y_val_preds = predict_sklearn(
+                model, 
+                val_data, 
+                features
+            )
             
             # Evaluate
             score = objective_fn(y_val_preds, y_val)

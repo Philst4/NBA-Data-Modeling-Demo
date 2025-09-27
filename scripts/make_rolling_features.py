@@ -30,14 +30,11 @@ def main(args):
     MAIN_TABLE_NAME = config['main_table_name']
 
     game_metadata = query_db(DB_PATH, f"SELECT * from {METADATA_TABLE_NAME}")
-    game_data = query_db(DB_PATH, f"SELECT * from {MAIN_TABLE_NAME}")
     
-    # Normalize the game data
-    if args.normalize:
-        game_data = get_normalized_by_season(
-            game_data=game_data,
-            game_metadata=game_metadata,
-        )
+    if not args.normalize:
+        game_data = query_db(DB_PATH, f"SELECT * from {MAIN_TABLE_NAME}")
+    else:
+        game_data = query_db(DB_PATH, f"SELECT * from {MAIN_TABLE_NAME}_norm")
     
     # Get rolling averages
     game_data_rolling_avgs = get_rolling_avgs(

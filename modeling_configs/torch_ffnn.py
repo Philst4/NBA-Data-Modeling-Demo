@@ -92,5 +92,6 @@ optimizer_hyperparam_space = {
 n_epochs = 1
 
 # Names
+model_name = "torch_ffnn"
 study_name = "torch_ffnn_study"
-model_filename = "torch_ffnn_model.pth"
+model_filename = "torch_ffnn_weights.pth"

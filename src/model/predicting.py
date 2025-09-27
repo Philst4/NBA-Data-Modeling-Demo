@@ -7,16 +7,25 @@ from torch.utils.data import DataLoader
 from src.model.dataloading import Gameset
 
 
+def predict_sklearn(
+    model,
+    data,
+    features
+):  
+    return model.predict(data[features])
+
 def predict_torch(
     model,
     data,
     features,
-    batch_size,
+    batch_size=-1,
     w_unique_ids=False,
 ):
     
     # Initialize DataLoader
     gameset = Gameset(data, features, [])
+    if batch_size == -1:
+        batch_size = 32
     gameloader = DataLoader(gameset, batch_size=batch_size, shuffle=False)
     
     # Initialize list to hold all predictions
@@ -40,31 +49,3 @@ def predict_torch(
     
     # Return
     return all_y_preds
-
-def predict_on_date(date : str):
-    """
-    Takes in a date and makes a prediction with the model.
-    """    
-
-    # Load model
-    model = load("model.joblib")
-
-    # Load in data
-    pass
-    data = None
-    features = None
-    batch_size = None
-    w_unique_ids = None
-    
-    # Use model to make predictions with data
-    if not isinstance(model, nn):
-        pass
-    else:
-        # For torch model
-        preds = predict_torch(
-            model, 
-            data,
-            features,
-            batch_size,
-            w_unique_ids
-        )

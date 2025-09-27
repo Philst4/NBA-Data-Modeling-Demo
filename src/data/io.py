@@ -76,28 +76,27 @@ def get_modeling_data(
     """
     
     if not date:
-        game_metadata = query_db(db_path, "SELECT * from game_metadata")
-        game_data = query_db(db_path, f"SELECT * from game_data")
-        game_data_prev = query_db(db_path, f"SELECT * from game_data_norm_prev_{window}")
+        game_metadata = query_db(db_path, "SELECT * FROM game_metadata")
+        game_data_norm = query_db(db_path, f"SELECT * FROM game_data_norm")
+        game_data_norm_prev = query_db(db_path, f"SELECT * FROM game_data_norm_prev_{window}")
     else:
-        # Find the season of specified date
-        game_metadata = query_db(db_path, f"SELECT * from game_metadata WHERE GAME_DATE is {date}")
-        game_data = query_db(db_path, f"SELECT * from game_data WHERE game_date is {date}")
-        game_data_prev = query_db(db_path, f"SELECT * from game_data_norm_prev_{window}")
+        
+        # Find the game_metadata from the specified date
+        game_metadata = query_db(db_path, f"SELECT * FROM game_metadata WHERE GAME_DATE = '{date}'")
+        
+        # Extract the proper UNIQUE_ID's from the date, use to query for relevant game_data + game_data_prev
+        unique_ids = list(game_metadata['UNIQUE_ID'])
+        
+        # Query for data that has those UNIQUE_ID's
+        game_data_norm = query_db(db_path, f"SELECT * FROM game_data_norm WHERE UNIQUE_ID in {tuple(unique_ids)}")
+        game_data_norm_prev = query_db(db_path, f"SELECT * FROM game_data_norm_prev_{window} WHERE UNIQUE_ID in {tuple(unique_ids)}")
     
     # Merge to get modeling data
-    modeling_data = pd.merge(game_metadata, game_data_prev, on='UNIQUE_ID')
-    modeling_data = pd.merge(modeling_data, game_data[['UNIQUE_ID', 'IS_HOME_for', 'IS_HOME_ag']], on='UNIQUE_ID')
-    
-    # Add the normalized target to modeling data
-    normalized_target = get_normalized_by_season(
-        game_data[['UNIQUE_ID', 'PLUS_MINUS_for']],
-        game_metadata
-    )
-    modeling_data = pd.merge(modeling_data, normalized_target, on='UNIQUE_ID')
+    modeling_data = pd.merge(game_metadata, game_data_norm_prev, on='UNIQUE_ID')
+    modeling_data = pd.merge(modeling_data, game_data_norm[['UNIQUE_ID', 'IS_HOME_for', 'IS_HOME_ag', 'PLUS_MINUS_for']], on='UNIQUE_ID')
     
     # Get features + target
-    rolling_avg_feature_names = [col for col in list(game_data_prev.columns) if col != 'UNIQUE_ID']
+    rolling_avg_feature_names = [col for col in list(game_data_norm_prev.columns) if col != 'UNIQUE_ID']
     features = ['IS_HOME_for', 'IS_HOME_ag'] + rolling_avg_feature_names
     target = 'PLUS_MINUS_for'
     

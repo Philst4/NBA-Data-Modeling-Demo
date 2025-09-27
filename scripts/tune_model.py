@@ -21,7 +21,7 @@ from src.data.io import (
 
 from src.model.tuning import make_backtest_objective
     
-def main():
+def main(args):
     """
     Makes an objective function using the specified configuration, 
     and tunes according to that objective function.
@@ -35,15 +35,8 @@ def main():
     DB_PATH = os.path.join(CLEAN_DIR, DB_NAME)
     MODELING_CONFIG_DIR = config['modeling_config_dir']
     OPTUNA_STORAGE = config["optuna_storage"]
-    
-    # Create argparser
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--modeling_config", type=str, default="lasso.py")
-    parser.add_argument("--n_trials", type=int, default=10)
-    parser.add_argument("--n_jobs", type=int, default=1, help="Used to parallelize building models ATM.")
         
     # Extract args (including modeling config)
-    args = parser.parse_args()
     modeling_config = args.modeling_config
     n_trials = args.n_trials
     n_jobs = args.n_jobs
@@ -90,4 +83,11 @@ def main():
     print(study.best_trial)
 
 if __name__ == "__main__":
-    main()
+    # Create argparser
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--modeling_config", type=str, default="lasso.py")
+    parser.add_argument("--n_trials", type=int, default=1)
+    parser.add_argument("--n_jobs", type=int, default=1, help="Used to parallelize building models ATM.")
+    
+    args = parser.parse_args()
+    main(args)

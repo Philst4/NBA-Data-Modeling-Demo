@@ -24,6 +24,10 @@ from src.data.io import (
     get_modeling_data
 )
 
+from src.model.initialization import (
+    extract_best_model_hyperparams_from_study
+)
+
 from src.model.training import (
     train_sklearn,
     train_torch,
@@ -52,7 +56,7 @@ def main(args):
     study = optuna.load_study(
         storage=OPTUNA_STORAGE,
         study_name=modeling_config.study_name
-    )
+    ) 
     
     # Extract model class from modeling config
     model_class = modeling_config.model_class
@@ -63,10 +67,7 @@ def main(args):
     all_hyperparams = study.best_trial.params
     
     # Extract best model hyperperams from study
-    model_hyperparams = {
-        key: all_hyperparams[key] if key in all_hyperparams else val
-        for key, val in modeling_config.model_hyperparam_space.items()
-    }
+    model_hyperparams = extract_best_model_hyperparams_from_study(modeling_config, OPTUNA_STORAGE)
     
     # Load in data, get training data
     modeling_data, features, target = get_modeling_data(DB_PATH)
@@ -119,7 +120,7 @@ def main(args):
     if not isinstance(model, nn.Module):
         dump(model, model_path)
     else:
-        torch.save(model, model_path)
+        torch.save(model.state_dict(), model_path)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

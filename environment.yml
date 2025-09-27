@@ -1,21 +1,23 @@
 name: nba
 channels:
+  - conda-forge
   - defaults
 dependencies:
   - python=3.10
   - pandas
   - matplotlib
   - numpy
+  - scipy
   - pyarrow
-  - yaml
   - pyyaml
   - seaborn
-  - cpuonly
   - pytorch
   - torchaudio
   - torchvision
+  #- cpuonly
   - optuna
   - scikit-learn
   - lightgbm
   - plotly
+  - streamlit
 prefix: /opt/anaconda3/envs/nba

@@ -4,7 +4,7 @@ import os
 
 model_class = LGBMRegressor
 model_hyperparam_space = {
-    "n_jobs": os.cpu_count() // 2,
+    "n_jobs": 1,
     "objective": "regression",
     "metric": "rmse",
     "verbosity": -1,
@@ -33,5 +33,6 @@ val_seasons = [2020, 2021, 2022, 2023, 2024]
 n_train_seasons_space = ("int", {"low" : 1, "high" : 10}) # Number of training seasons to use
 
 # Names
+model_name = "lgbm"
 study_name = "lgbm_study"
 model_filename = "lgbm_model.joblib"

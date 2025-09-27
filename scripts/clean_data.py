@@ -1,6 +1,8 @@
 # Standard library imports
 import sys
 import os
+import argparse
+
 # Add the project root to the Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(project_root)
@@ -13,32 +15,107 @@ import sqlite3
 # Local imports
 from src.data.io import (
     read_from_csv,
+    query_db,
     save_to_db
 )
 
 from src.data.cleaning import (
-    get_summary_stats,
+    add_cols,
+    make_id_map,
     drop_cols,
     fill_plus_minus,
     mirror,
     deal_w_NaNs,
 )
 
-if __name__ == "__main__":
-    print("--- RUNNING DATA ETL SCRIPT ---")
+from src.data.processing import (
+    get_normalized_by_season
+)
+
+def clean_metadata(config):
+    print("--- RUNNING METADATA CLEANING SCRIPT --- ")
     
     # (0) Read in configuration
-    with open('config.yaml', 'r') as file:
-        config = yaml.safe_load(file)
     RAW_DIR = config['raw_data_dir']
     RAW_FILE_NAME = config['raw_filename']
     RAW_FILE_PATH = os.path.join(RAW_DIR, RAW_FILE_NAME)
     CLEAN_DIR = config['clean_data_dir']
     DB_NAME = config['db_name']
     
+    metadata_config = config['metadata']
+    GAME_METADATA_NAME = metadata_config['games']['table_name']
+    GAME_META_COLS = metadata_config['games']['columns']
+    TEAM_METADATA_NAME = metadata_config['teams']['table_name']
+    TEAM_META_COLS = metadata_config['teams']['columns']
+    
+    # (1) Read in raw data
+    games = read_from_csv(RAW_FILE_PATH)
+    
+    # (2) Keep what is needed
+    # Keep relevant columns
+    game_metadata = games.loc[:, GAME_META_COLS]
+    team_metadata = games.loc[:, TEAM_META_COLS]
+    
+    # Remove repeats from team_metadata
+    team_metadata = team_metadata.drop_duplicates(subset=['SEASON_ID', 'TEAM_ID'])
+    team_metadata = team_metadata.reset_index(drop=True)
+    
+    # Add new team id to game metadata, team metadata
+    cols_to_add = ['NEW_TEAM_ID']
+    dependencies = [['TEAM_ID']]
+    maps = [make_id_map(games, 'TEAM_ID')]
+    add_cols(
+        team_metadata, 
+        cols_to_add, 
+        dependencies, 
+        maps
+    )
+    add_cols(
+        game_metadata,
+        cols_to_add, 
+        dependencies,
+        maps
+    )
+    
+    # (3) Set types (N/A)
+    # Not needed
+    pass
+    game_metadata = mirror(
+        game_metadata, 
+        cols_to_mirror=['NEW_TEAM_ID', 'TEAM_ABBREVIATION']
+    ) 
+    drop_cols(game_metadata, ['TEAM_ID'])
+    
+    # (4) Save (TODO update save_to_db for primary keys)
+    # Save game_metadata
+    save_to_db(
+        game_metadata,
+        CLEAN_DIR,
+        DB_NAME,
+        GAME_METADATA_NAME
+    )
+    
+    # Save team_metadata
+    save_to_db(
+        team_metadata,
+        CLEAN_DIR,
+        DB_NAME,
+        TEAM_METADATA_NAME
+    )
+
+def clean_data(args, config):
+    print("--- RUNNING DATA CLEANING SCRIPT ---")
+    
+    # (0) Read in configuration
+    RAW_DIR = config['raw_data_dir']
+    RAW_FILE_NAME = config['raw_filename']
+    RAW_FILE_PATH = os.path.join(RAW_DIR, RAW_FILE_NAME)
+    CLEAN_DIR = config['clean_data_dir']
+    DB_NAME = config['db_name']
+    DB_PATH = os.path.join(CLEAN_DIR, DB_NAME)
+    
     # Loop will start here
     MAIN_TABLE_NAME = config['main_table_name']
-    SUMMARY_TABLE_NAME = MAIN_TABLE_NAME + '_summary'
     cols_to_drop = [
         'SEASON_ID',
         'GAME_ID',
@@ -91,4 +168,45 @@ if __name__ == "__main__":
         DB_NAME,
         MAIN_TABLE_NAME
     )
+    
+    # (8) Save a normalized game data table if specified
+    if args.w_norm_game_data:
+        
+        # Read in game metadata
+        try:
+            game_metadata = query_db(DB_PATH, f"SELECT * FROM {config['metadata']['games']['table_name']}")
+        except:
+            "Error fetching game_metadata, ensure that the script 'clean_metadata.py' is run before trying to save normalized clean data."
+        
+        # Compute normalized game data
+        games_norm, games_means_stds = get_normalized_by_season(games, game_metadata)
+        
+        # Save
+        save_to_db(
+            games_norm,
+            CLEAN_DIR,
+            DB_NAME,
+            MAIN_TABLE_NAME + "_norm"
+        )
+        
+        save_to_db(
+            games_means_stds,
+            CLEAN_DIR,
+            DB_NAME,
+            MAIN_TABLE_NAME + "_means_stds"
+        )
+
+def main(args):
+    with open('config.yaml', 'r') as file:
+        config = yaml.safe_load(file)
+    clean_metadata(config)
+    clean_data(args, config)
+
+if __name__ == "__main__":
+    # (-1) Deal with arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--w_norm_game_data", type=bool, default=True, help="Whether or not to normalize game data as well")
+    args = parser.parse_args()
+    
+    main(args)
     
