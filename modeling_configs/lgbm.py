@@ -4,6 +4,13 @@ import os
 
 model_class = LGBMRegressor
 model_hyperparam_space = {
+    # For reproducibility
+    "seed": 42,
+    "bagging_seed": 42,
+    "feature_fraction_seed": 42,
+    "drop_seed": 42,
+    
+    # Hyperparams
     "n_jobs": 1,
     "objective": "regression",
     "metric": "rmse",

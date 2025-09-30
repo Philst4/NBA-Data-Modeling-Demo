@@ -46,6 +46,7 @@ def backtest(
     
     # Dictionary to store metrics
     metrics = {
+        "val_season" : [],
         "mae" : [],
         "rmse" : [],
         "r2" : [],
@@ -133,7 +134,8 @@ def backtest(
         metrics['score'].append(score)
         
         iter_end_time = time()
-    
+
+        metrics['val_season'].append(val_season)
         metrics['mae'].append(mean_absolute_error(y_val, y_val_preds))
         metrics['rmse'].append(root_mean_squared_error(y_val, y_val_preds))
         metrics['r2'].append(r2_score(y_val, y_val_preds))
@@ -148,6 +150,7 @@ def backtest(
         
         if verbose:
             # Print metrics
+            print(f" -> Val Season: {metrics['val_season'][-1]}")
             print(f" -> MAE: {metrics['mae'][-1]:.3f}")
             print(f" -> RMSE: {metrics['rmse'][-1]:.3f}")
             print(f" -> R^2 Score: {metrics['r2'][-1]:.3f}")

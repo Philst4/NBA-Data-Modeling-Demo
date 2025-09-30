@@ -4,11 +4,6 @@ import os
 import pandas as pd
 import sqlite3
 
-# Internal imports
-from src.data.processing import (
-    get_normalized_by_season,
-)
-
 
 def save_as_csv(
     df : pd.DataFrame, 

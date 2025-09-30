@@ -14,7 +14,7 @@ import sqlite3
 
 # Local imports
 from src.data.io import (
-    read_from_csv,
+    read_from_parquet,
     query_db,
     save_to_db
 )
@@ -49,7 +49,10 @@ def clean_metadata(config):
     TEAM_META_COLS = metadata_config['teams']['columns']
     
     # (1) Read in raw data
-    games = read_from_csv(RAW_FILE_PATH)
+    games = read_from_parquet(RAW_FILE_PATH)
+    
+    # (1.5) Turn 'SEASON_ID' to int
+    games['SEASON_ID'] = games['SEASON_ID'].astype(int)
     
     # (2) Keep what is needed
     # Keep relevant columns
@@ -137,7 +140,7 @@ def clean_data(args, config):
     COLS_TO_DROP_C = [col for col in cols_to_drop if col not in COLS_TO_DROP_A and col not in COLS_TO_DROP_B]
     
     # (1) Read in raw data, drop unneeded
-    games = read_from_csv(RAW_FILE_PATH)
+    games = read_from_parquet(RAW_FILE_PATH)
     drop_cols(games, COLS_TO_DROP_A)
     
     # (2) Convert types (revisit)
@@ -163,7 +166,7 @@ def clean_data(args, config):
     
     # (7) Save cleaned data
     save_to_db(
-        games, 
+        games.sort_values(by='UNIQUE_ID'), 
         CLEAN_DIR,
         DB_NAME,
         MAIN_TABLE_NAME
@@ -183,7 +186,7 @@ def clean_data(args, config):
         
         # Save
         save_to_db(
-            games_norm,
+            games_norm.sort_values(by='UNIQUE_ID'),
             CLEAN_DIR,
             DB_NAME,
             MAIN_TABLE_NAME + "_norm"

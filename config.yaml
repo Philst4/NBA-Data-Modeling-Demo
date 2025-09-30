@@ -1,7 +1,7 @@
 
 # For raw data
 raw_data_dir : "data/raw/"
-raw_filename : "raw.csv"
+raw_filename : "raw.parquet"
 
 # For main database
 clean_data_dir : "data/clean/"

@@ -15,7 +15,6 @@ from src.data.io import (
     save_to_db
 )
 from src.data.processing import (
-    get_normalized_by_season,
     get_rolling_avgs
 )
 
@@ -50,7 +49,7 @@ def main(args):
     suffix += "prev_" + str(args.window)
     
     save_to_db(
-        game_data_rolling_avgs, 
+        game_data_rolling_avgs.sort_values(by=['UNIQUE_ID']), 
         CLEAN_DIR,
         DB_NAME,
         MAIN_TABLE_NAME + suffix

@@ -16,6 +16,8 @@ import torch
 import torch.nn as nn
 
 # Internal imports
+from src.utils import set_seed
+
 from src.model.config_mgmt import (
     load_modeling_config,
 )
@@ -51,6 +53,9 @@ def main(args):
             args.modeling_config
         )
     )
+    
+    # Set seed
+    set_seed()
     
     # Load in study
     study = optuna.load_study(

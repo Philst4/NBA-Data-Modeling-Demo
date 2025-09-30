@@ -1,6 +1,7 @@
 # Standard library imports
 import sys
 import os
+import argparse
 
 # Add the project root to the Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -11,25 +12,9 @@ import yaml
 import optuna
 import numpy as np
 
-def main():
-    # (0) Read in configuration
-    with open('config.yaml', 'r') as file:
-        config = yaml.safe_load(file)
-    OPTUNA_STORAGE = config['optuna_storage']
+# Internal imports 
+from src.utils import season_int_to_str
 
-    study_names = optuna.study.get_all_study_names(storage=OPTUNA_STORAGE)
-
-    print(f"Existing studies at '{OPTUNA_STORAGE}':")
-    for name in study_names:
-        study = optuna.load_study(study_name=name, storage=OPTUNA_STORAGE)
-
-        n_trials = len(study.trials)
-        best_value = study.best_trial.value if study.best_trial is not None else "No completed trials"
-
-        print(f" * {name}")
-        print(f" * * Number of trials: {n_trials}")
-        print(f" * * Best trial value: {best_value:.3f}")
-        
 def main():
     # (0) Read in configuration
     with open('config.yaml', 'r') as file:
@@ -58,12 +43,34 @@ def main():
         print(f" * Best trial number: {best_num}")
         print(f" * Best trial value: {best_value:.3f}")
 
-        if metrics:
-            print(" * Metrics:")
-            for k, v in metrics.items():
-                print(f" --- {k}: {np.mean(v):.3f}")
-        else:
-            print(" * Metrics: (none)")
+        # Header
+        print(" * Metrics:")
+
+        # Find the max number of values across all metrics
+        max_len = max(len(v) for v in metrics.values())
+
+        # Build header
+        header = ["Split"] + [f"{i+1}" for i in range(max_len)] + ["Mean"]
+        print(" | ".join(h.ljust(10) for h in header))
+        print("-" * (13 * len(header)))
+
+        # Rows
+        for k, v in metrics.items():
+            row = [k.ljust(10)]
+            if k == "val_season":
+                vals = [season_int_to_str(szn) for szn in v]
+                mean_str = "-"
+            else:
+                vals = [f"{num:.3f}" for num in v]
+                mean_str = f"{np.mean(v):.3f}"
+            
+            # Pad with blanks so all rows have same length
+            vals += [""] * (max_len - len(vals))
+            row.extend(val.ljust(10) for val in vals)
+            row.append(mean_str.ljust(10))
+            
+            print(" | ".join(row))
+
     
 if __name__ == "__main__":
     main()

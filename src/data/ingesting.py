@@ -71,11 +71,18 @@ def ingest_from_leaguegamefinder(
     season_dfs = []
     for season in seasons:
         print(" * Reading in games from ", season, "...")
-        game_finder = leaguegamefinder.LeagueGameFinder(
-            season_nullable=season,
-            season_type_nullable='Regular Season',
-            league_id_nullable='00'  # Specifies NBA league
-        )
+        
+        try:
+            game_finder = leaguegamefinder.LeagueGameFinder(
+                season_nullable=season,
+                season_type_nullable='Regular Season',
+                league_id_nullable='00'  # Specifies NBA league
+            )
+        except:
+            # If the endpoint fails on a season, we'll just return what we got.
+            print(f" - - Endpoint failed on '{season}' season, breaking out of ingestion...")
+            break
+            
         # Sleep after each request
         time.sleep(sleep_time)
 

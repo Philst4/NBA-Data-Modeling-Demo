@@ -3,6 +3,7 @@ from sklearn.linear_model import Lasso
 
 model_class = Lasso
 model_hyperparam_space = {
+    "random_state" : 42,
     "alpha": ("float", {"low" : 1e-4, "high" : 10, "log": True}),
 }
 objective_fn = root_mean_squared_error

@@ -3,21 +3,23 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python=3.10
-  - pandas
+  - lightgbm
   - matplotlib
   - numpy
-  - scipy
+  - optuna
+  - pandas
+  - plotly
   - pyarrow
-  - pyyaml
-  - seaborn
+  - python=3.10
   - pytorch
+  - pyyaml
+  - scikit-learn
+  - scipy
+  - seaborn
   - torchaudio
   - torchvision
-  #- cpuonly
-  - optuna
-  - scikit-learn
-  - lightgbm
-  - plotly
   - streamlit
+  - pip
+  - pip:
+    - nba-api==1.10.1
 prefix: /opt/anaconda3/envs/nba

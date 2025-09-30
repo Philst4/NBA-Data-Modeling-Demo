@@ -5,8 +5,8 @@ import torch
 import torch.nn as nn
 
 # Internal imports
+from src.utils import set_seed
 from src.model.evaluating import backtest
-
 
 def sample_hyperparam(trial, name, specs):
     """
@@ -49,7 +49,7 @@ def make_backtest_objective(
     batch_size=None,
     optimizer_class=None,
     optimizer_hyperparam_space=None,
-    n_epochs=None,
+    n_epochs_space=None,
     verbose=True
     
 ):
@@ -64,6 +64,9 @@ def make_backtest_objective(
     """
     
     def objective(trial):
+        # Set seed
+        set_seed()
+        
         # Sample model hyperparameters
         model_hyperparams = sample_hyperparams(trial, model_hyperparam_space)
         
@@ -72,11 +75,14 @@ def make_backtest_objective(
         
         # For torch setup only
         if issubclass(model_class, nn.Module):
+            
             # Sample optimizer hyperparameters
             optimizer_hyperparams = sample_hyperparams(trial, optimizer_hyperparam_space)
+            n_epochs = sample_hyperparam(trial, "n_epochs", n_epochs_space)
             
         else:
             optimizer_hyperparams = None
+            n_epochs = None
             
         # Backtest the model
         metrics = backtest(

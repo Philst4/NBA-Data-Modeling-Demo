@@ -11,8 +11,8 @@ import pandas as pd
 
 # Local imports
 from src.data.io import (
-    save_as_csv,
-    read_from_csv
+    save_as_parquet,
+    read_from_parquet
 )
 
 from src.data.ingesting import (
@@ -36,7 +36,7 @@ def main():
     # (1) Check if raw exists, and
     # (2) Read in relevant data from NBA API
     if os.path.exists(RAW_FILE_PATH):
-        existing_games = read_from_csv(RAW_FILE_PATH)
+        existing_games = read_from_parquet(RAW_FILE_PATH)
         last_read = existing_games['GAME_DATE'].max()
         print(f"Existing reserve at '{RAW_FILE_PATH}' exists; last game in reserve on '{last_read}'")
         print(f" Will read in all seasons with potential new games")
@@ -73,10 +73,10 @@ def main():
         len_total = len(games)
     
     # (7) Save file
-    save_as_csv(
+    save_as_parquet(
         df=games, 
         write_dir=RAW_DATA_DIR,
-        csv_name=RAW_FILE_NAME,
+        parquet_name=RAW_FILE_NAME,
     )
     print(f"{len_total} games in the reserve at '{RAW_FILE_PATH}'")
 

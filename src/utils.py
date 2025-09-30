@@ -18,6 +18,7 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 import math
+import random
 
 #### STRING PROCESSING UTILITIES ####
 def season_int_to_str(season : int) -> str:
@@ -361,4 +362,10 @@ def plot_heat_map(model : nn.Module, dataloader : DataLoader, n_games : int=51, 
 
     # Show plot
     plt.show()
+    
+    
+def set_seed(seed: int=42):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
     

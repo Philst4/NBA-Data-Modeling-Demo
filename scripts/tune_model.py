@@ -65,15 +65,17 @@ def main(args):
         modeling_config.batch_size,
         modeling_config.optimizer_class,
         modeling_config.optimizer_hyperparam_space,
-        modeling_config.n_epochs
+        modeling_config.n_epochs_space
     )
     
-    # Make study
+    # Make study (with seed)
+    sampler = optuna.samplers.TPESampler(seed=42)
     study = optuna.create_study(
         study_name=modeling_config.study_name,
         direction="minimize",
         storage=OPTUNA_STORAGE,
-        load_if_exists=True
+        load_if_exists=True,
+        sampler=sampler
     )
     
     # Tune!

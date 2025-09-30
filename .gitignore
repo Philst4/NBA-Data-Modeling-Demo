@@ -11,9 +11,7 @@ __pycache__/
 /data/
 *.db
 
-# Models
-*.joblib
-*.pth
-
 # Other to ignore (for now)
-app.py
+dockerfile
+requirements.txt
+#app.py

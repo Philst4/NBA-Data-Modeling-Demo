@@ -16,7 +16,7 @@ TORCH_CONFIG_VARS = [
     "batch_size",
     "optimizer_class",
     "optimizer_hyperparam_space",
-    "n_epochs",
+    "n_epochs_space",
 ]
 
 def load_modeling_config(config_path):
