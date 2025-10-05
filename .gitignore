@@ -6,6 +6,7 @@ __pycache__/
 
 # Virtual environment
 *.venv
+nba/
 
 # Data + databases
 /data/
@@ -13,5 +14,5 @@ __pycache__/
 
 # Other to ignore (for now)
 dockerfile
-requirements.txt
-#app.py
+#requirements.txt
+environment.yml

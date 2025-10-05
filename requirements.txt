@@ -1,0 +1,31 @@
+# requirements.txt
+# Python version
+pip==24.2
+
+# Core scientific stack
+numpy
+pandas
+scipy
+matplotlib
+seaborn
+plotly
+#pyarrow
+
+# Machine learning & optimization
+scikit-learn
+lightgbm
+optuna
+
+# Deep learning
+torch
+torchvision
+torchaudio
+
+# App / visualization
+streamlit
+
+# YAML parsing
+pyyaml
+
+# NBA data API
+nba-api==1.10.1
