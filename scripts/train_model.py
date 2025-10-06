@@ -82,6 +82,9 @@ def main(args):
     train_condn2 = last_train_season - (modeling_data['SEASON_ID'] - 20_000) <= n_train_seasons
     training_data = modeling_data.loc[train_condn1 & train_condn2, :]
     
+    # Get device
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
     # Train the model
     print(f"\nTraining '{model_class}' using best hyperparams from '{modeling_config.study_name}'...")
     if not issubclass(model_class, nn.Module):
@@ -91,7 +94,8 @@ def main(args):
             model_hyperparams,
             training_data,
             features,
-            target
+            target,
+            device
         )
         
     else:
@@ -101,6 +105,9 @@ def main(args):
             key : all_hyperparams[key] if key in all_hyperparams else val 
             for key, val in modeling_config.optimizer_hyperparam_space.items()
         }
+        
+        # Other hparams for torch
+        n_epochs = all_hyperparams['n_epochs']
         
         # Train model
         model = train_torch(
@@ -113,7 +120,8 @@ def main(args):
             modeling_config.optimizer_class,
             optimizer_hyperparams,
             modeling_config.objective_fn,
-            modeling_config.n_epochs
+            n_epochs,
+            device
         )
     
     # Ensure storage path exists

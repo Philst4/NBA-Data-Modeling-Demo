@@ -2,6 +2,7 @@
 from time import time
 from tqdm import tqdm
 from torch.utils.data import DataLoader
+from lightgbm import LGBMRegressor
 
 # Internal imports
 from src.model.dataloading import Gameset
@@ -11,7 +12,8 @@ def train_sklearn(
     model_hyperparams,
     training_data,
     features, 
-    target
+    target,
+    device=None
 ):
      
     assert len(training_data) > 0, f"No training data."
@@ -19,6 +21,10 @@ def train_sklearn(
     # Get features/target
     X_tr = training_data[features]
     y_tr = training_data[target]
+    
+    # Add 'gpu' as hyperparam if device is cuda (for LGBM)
+    if device.type == "cuda" and issubclass(model, LGBMRegressor):
+        model_hyperparams['device'] = "gpu"
     
     # Instantiate model
     model = model_class(**model_hyperparams)
@@ -40,11 +46,12 @@ def train_torch(
     optimizer_hyperparams,
     objective_fn, # For calculating loss/stepping w/ optimizer
     n_epochs, # How many passes over entire dataset to give model!
+    device=None
     
 ):  
     # Initialize DataLoader
     trainset = Gameset(training_data, features, [target])
-    trainloader = DataLoader(trainset, batch_size=batch_size, shuffle=True)
+    trainloader = DataLoader(trainset, batch_size=batch_size, shuffle=True, pin_memory=device.type != "cpu")
     
     # Initialize model
     model = model_class(
@@ -52,6 +59,9 @@ def train_torch(
         output_dim=trainset.get_output_dim(),      
         **model_hyperparams
     )
+    
+    if device is not None:
+        model = model.to(device)
     
     # Initialize optimizer
     optimizer = optimizer_class(params=model.parameters(), **optimizer_hyperparams)
@@ -62,7 +72,9 @@ def train_torch(
         # Iterate over batch
         for batch_idx, (X, y) in enumerate(tqdm(trainloader, desc=f" -- Epoch {epoch + 1}/{n_epochs} -- ")):
             # Move tensors to proper device
-            pass
+            if device is not None:
+                X = X.to(device)
+                y = y.to(device)
         
             # Forward pass
             y_preds = model(X)

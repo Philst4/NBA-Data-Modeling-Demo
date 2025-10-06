@@ -9,6 +9,7 @@ sys.path.append(project_root)
 # External imports
 import yaml
 import optuna
+import torch
 
 # Internal imports
 from src.model.config_mgmt import (
@@ -52,6 +53,9 @@ def main(args):
     # Get modeling data
     modeling_data, features, target = get_modeling_data(db_path=DB_PATH)
     
+    # Get device
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
     # Make objective
     objective = make_backtest_objective(
         modeling_config.model_class,
@@ -65,7 +69,8 @@ def main(args):
         modeling_config.batch_size,
         modeling_config.optimizer_class,
         modeling_config.optimizer_hyperparam_space,
-        modeling_config.n_epochs_space
+        modeling_config.n_epochs_space,
+        device=device
     )
     
     # Make study (with seed)

@@ -50,6 +50,7 @@ def make_backtest_objective(
     optimizer_class=None,
     optimizer_hyperparam_space=None,
     n_epochs_space=None,
+    device=None,
     verbose=True
     
 ):
@@ -98,6 +99,7 @@ def make_backtest_objective(
             optimizer_class,
             optimizer_hyperparams,
             n_epochs,
+            device,
             verbose=True
         )
         

@@ -37,12 +37,12 @@ def backtest(
     optimizer_class=None,
     optimizer_hyperparams=None,
     n_epochs=None,
+    device=None,
     verbose=True
 ):
     """
     Accumulates metrics of models trained/validated on specified train-val splits.
     """
-    scores = []
     
     # Dictionary to store metrics
     metrics = {
@@ -83,7 +83,8 @@ def backtest(
                 model_hyperparams,
                 training_data,
                 features,
-                target
+                target,
+                device
             )
             
             # Predict for validation set
@@ -100,7 +101,6 @@ def backtest(
         else:
             # For torch-style model setups
             # Get model instance fit on the training data
-            
             model = train_torch(
                 model_class,
                 model_hyperparams,
@@ -111,23 +111,24 @@ def backtest(
                 optimizer_class,
                 optimizer_hyperparams,
                 objective_fn,
-                n_epochs
+                n_epochs,
+                device
             )
             
             # Predict for validation set
-            # TODO: make a 'predict_torch' function.
             y_val_preds = predict_torch(
                 model, 
                 val_data, 
                 features, 
-                batch_size
+                batch_size,
+                device
             )
             y_val = torch.tensor(val_data[[target]].values)
             score = objective_fn(y_val_preds, y_val).item()
             
             # Convert to numpy for next part
-            y_val_preds = y_val_preds.numpy()
-            y_val = y_val.numpy()
+            y_val_preds = y_val_preds.detach().cpu().numpy()
+            y_val = y_val.detach().cpu().numpy()
             
         
         # Evaluate the model on the validation data

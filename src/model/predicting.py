@@ -19,6 +19,7 @@ def predict_torch(
     data,
     features,
     batch_size=-1,
+    device=None,
     w_unique_ids=False,
 ):
     
@@ -36,7 +37,8 @@ def predict_torch(
         for batch_idx, (X, _) in enumerate(gameloader):
             
             # Move tensors to proper device
-            pass
+            if device is not None:
+                X = X.to(device)
         
             # Forward pass
             y_preds = model(X)
