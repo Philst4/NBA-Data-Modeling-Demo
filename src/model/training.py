@@ -23,7 +23,7 @@ def train_sklearn(
     y_tr = training_data[target]
     
     # Add 'gpu' as hyperparam if device is cuda (for LGBM)
-    if device.type == "cuda" and issubclass(model, LGBMRegressor):
+    if device.type == "cuda" and issubclass(model_class, LGBMRegressor):
         model_hyperparams['device'] = "gpu"
     
     # Instantiate model
