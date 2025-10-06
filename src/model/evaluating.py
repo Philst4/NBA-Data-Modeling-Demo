@@ -123,7 +123,7 @@ def backtest(
                 batch_size,
                 device
             )
-            y_val = torch.tensor(val_data[[target]].values)
+            y_val = torch.tensor(val_data[[target]].values).to(device)
             score = objective_fn(y_val_preds, y_val).item()
             
             # Convert to numpy for next part
