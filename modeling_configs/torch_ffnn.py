@@ -72,8 +72,8 @@ class FFNN(nn.Module):
     
 model_class = FFNN
 model_hyperparam_space = {
-    "hidden_dim" : 256, #("int", {"low" : 256, "high" : 256}),
-    "n_hidden_layers" : 2, #("int", {"low" : 2, "high" : 2}),
+    "hidden_dim" : 256, 
+    "n_hidden_layers" : ("int", {"low" : 1, "high" : 4}),
 }
 
 # Need objective function to accept torch tensors
