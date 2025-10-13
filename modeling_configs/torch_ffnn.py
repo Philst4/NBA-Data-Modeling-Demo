@@ -72,7 +72,7 @@ class FFNN(nn.Module):
     
 model_class = FFNN
 model_hyperparam_space = {
-    "hidden_dim" : 256, 
+    "hidden_dim" : ("int", {"low" : 128, "high" : 1024}), 
     "n_hidden_layers" : ("int", {"low" : 1, "high" : 4}),
 }
 

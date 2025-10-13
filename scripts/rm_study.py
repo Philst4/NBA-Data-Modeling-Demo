@@ -17,12 +17,6 @@ def main(args):
         config = yaml.safe_load(file)
     OPTUNA_STORAGE = config['optuna_storage']
     
-    # Load in study
-    study = optuna.load_study(
-        study_name=args.study_name, 
-        storage=OPTUNA_STORAGE
-    )
-    
     # Delete the specified study
     optuna.delete_study(
         study_name=args.study_name, 
