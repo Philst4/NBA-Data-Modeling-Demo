@@ -19,6 +19,7 @@ dependencies:
   - torchaudio
   - torchvision
   - streamlit
+  - flask
   - pip
   - pip:
     - nba-api==1.10.1

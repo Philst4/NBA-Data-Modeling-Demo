@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <style>
+    table.dataframe th, table.dataframe td {
+        text-align: center;
+        vertical-align: middle;
+    }
+    table.dataframe {
+        width: 100%;
+    }
+    </style>
+    <meta charset="UTF-8">
+    <title>NBA Game Outcome Predictor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="p-4">
+    <div class="container">
+        <h1 class="mb-4">NBA Game Outcome Predictor</h1>
+
+        <form method="POST" class="mb-4">
+            <div class="row g-3 align-items-center">
+                <div class="col-auto">
+                    <label for="game_date" class="col-form-label">Select game date:</label>
+                </div>
+                <div class="col-auto">
+                    <input type="date" id="game_date" name="game_date" required
+                           class="form-control"
+                           min="{{ min_date }}" max="{{ max_date }}"
+                           value="{{ selected_date }}">
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-primary">Predict</button>
+                </div>
+            </div>
+        </form>
+
+        {% if pred_dfs %}
+            {% for df in pred_dfs %}
+                <h3>{{ df.model_name }}</h3>
+                <p><strong>MAE:</strong> {{ "%.3f"|format(df.mae) }} |
+                <strong>Accuracy:</strong> {{ "%.1f"|format(df.accuracy) }}%</p>
+                {{ df.predictions_html | safe }}
+                <hr>
+            {% endfor %}
+        {% endif %}
+
+        {% if results_df is not none %}
+            <h3>Actual Results</h3>
+            {{ results_df_html | safe }}
+        {% endif %}
+    </div>
+</body>
+</html>
