@@ -58,8 +58,7 @@ visualization via Flask/Streamlit.
     ├── flask_app.py
     ├── streamlit_app.py
     ├── config.yaml
-    ├── environment.yml
-    └── requirements.txt
+    └── environment.yml
 
 ------------------------------------------------------------------------
 

@@ -14,5 +14,5 @@ nba/
 
 # Other to ignore (for now)
 dockerfile
-#requirements.txt
+requirements.txt
 environment.yml
