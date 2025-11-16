@@ -1,47 +1,171 @@
-##
+# NBA Data Modeling Demo
 
-Project README
+A modular, end-to-end NBA analytics pipeline for data ingestion,
+cleaning, feature engineering, model tuning, training, and interactive
+visualization via Flask/Streamlit.
+
+------------------------------------------------------------------------
+
+## Tools & Libraries Used
+
+-   **Pandas**, **NumPy**
+-   **SQLite3** (data storage + management)
+-   **Matplotlib**, **Seaborn**, **Plotly** (visualizations)
+-   **Optuna** (hyperparameter tuning)
+-   **Scikit-Learn**
+-   **LightGBM (LGBM)** 
+-   **PyTorch** (FFNN deep learning model)
+-   **Flask / Streamlit** (web applications)
+
+------------------------------------------------------------------------
+
+## Project Structure
+
+    NBA-Data-Modeling-Demo/
+    │
+    ├── data/
+    │   ├── raw/
+    │   │   └── raw.parquet
+    │   └── clean/
+    │       └── cleaned_data.db
+    │
+    ├── modeling_configs/
+    │   ├── baseline_0.py
+    │   ├── baseline_1.py
+    │   ├── lasso.py
+    │   ├── lgbm.py
+    │   └── torch_ffnn.py
+    │
+    ├── scripts/
+    │   ├── ingest_data.py
+    │   ├── clean_data.py
+    │   ├── make_rolling_features.py
+    │   ├── tune_model.py
+    │   ├── train_model.py
+    │   ├── check_db.py
+    │   ├── check_studies.py
+    │   ├── visualize_study.py
+    │   ├── rm_table.py
+    │   └── rm_study.py
+    │
+    ├── src/
+    │   ├── data/
+    │   ├── model/
+    │   └── utils.py
+    │
+    ├── models/
+    │── optuna_studies.db
+    ├── flask_app.py
+    ├── streamlit_app.py
+    ├── config.yaml
+    ├── environment.yml
+    └── requirements.txt
+
+------------------------------------------------------------------------
+
+## Pipeline Overview
+
+All scripts are modular and build on each other.
+
+### **1. Ingest Raw Data**
+
+    python scripts/ingest_data.py
+
+Fetches team-level NBA data from the NBA API and stores it in
+`data/raw`.
+
+------------------------------------------------------------------------
+
+### **2. Clean Data**
+
+    python scripts/clean_data.py
+
+Cleans the raw parquet and loads it into **cleaned_data.db** (SQLite).
+
+------------------------------------------------------------------------
+
+### **3. Generate Rolling Features**
+
+    python scripts/make_rolling_features.py
+
+Creates rolling statistical features for predictive modeling.
+
+Optional database utilities:
+
+    python scripts/check_db.py
+    python scripts/rm_table.py
+
+------------------------------------------------------------------------
+
+### **4. Tune Model with Optuna**
+
+    python scripts/tune_model.py
+
+Optional tuning management:
+
+    python scripts/check_studies.py
+    python scripts/visualize_study.py
+    python scripts/rm_study.py
+
+------------------------------------------------------------------------
+
+### **5. Train Model**
+
+    python scripts/train_model.py
+
+Uses best hyperparameters found through tuning.
+
+Requires selecting a modeling config from `modeling_configs/`.
+
+------------------------------------------------------------------------
+
+### **6. Launch Local Web App**
+
+    python flask_app.py
+
+View: - Model prediction performance\
+- Predictions across historical game dates\
+- Model-by-model comparison
+
+Streamlit alternative:
+
+    python streamlit_app.py
+
+------------------------------------------------------------------------
+
+## Modeling Configurations
+
+Model setups are modular and can be swapped by editing `config.yaml`.
+
+Included configs: - Baseline models (`baseline_0.py`, `baseline_1.py`)
+- Lasso regression (`lasso.py`) - LightGBM (`lgbm.py`)
+- PyTorch feedforward network (`torch_ffnn.py`)
+
+The framework is designed to support: - Any sklearn model\
+- Advanced tree models\
+- Custom deep learning architectures
+
+------------------------------------------------------------------------
+
+## Environment Setup
+
+    conda env create -f environment.yml
+    conda activate nba
+
+------------------------------------------------------------------------
+
+## Notes
+
+-   Tuning must occur before training so the trainer can load optimized
+    hyperparameters.
+-   This repository is a **public demo version** of a private repo with
+    more substantial data ingestion, feature engineering, and modeling
+    techniques achieving more competitive accuracy
 
 
-Tools Used:
- * Pandas
- * NumPy
- * SQLite3 (data management)
- * Matplotlib + Seaborn + Plotly (visualizations)
- * Optuna (model tuning)
- * SciKit-Learn
- * LGBM
- * PyTorch
- * Flask/Streamlit
 
+------------------------------------------------------------------------
 
-Steps in pipeline:
-Scripts build off of one another
+## License
 
-(1) python scripts/ingest_data.py
-* Ingests team-level data from the NBA API. 
-
-(2) python scripts/clean_data.py
-* Cleans raw ingested data
-
-(3) python scripts/make_rolling_features.py
-* Makes rolling features that are useful for prediction down the line
-* OPTIONAL: Can use python scripts/check_db.py to see what is inside the sqlite DB; also python scripts/rm_table.py for DB mgmt
-
-(4) python scripts/tune_model.py
-
-* OPTIONAL: Can use 'python scripts/check_studies.py' and 'python scripts/visualize_study.py' to check tuning studies in optuna_studies.db;
-    also python scripts/rm_study.py for tuning management
-
-(5) python scripts/train_model.py 
-* Extracts best hyperparams from tuning ATM, so need to tune a model first
-
-(6) Finally, can run python flask_app.py to run locally run web app and visualize performances of tuned/trained models
-* Can navigate all model predictions made for (already played) games made on any date
-
-NOTES:
- * Tuning and training scripts require specifying a modeling_config file (located in modeling_configs; by default 'lasso.py').
- * Fully modular tuning/training setup designed to support many different ML/DL packages + model setups
- * Existing modeling configs are for sklearn models, LGBM model, and DL FFNN model using PyTorch
- * Environment management handled with conda; environment.yml file is included (conda env should be set up before running scripts/project)
- * This repo is a public demo version; has been extended privately
+MIT License (or update as appropriate)
