@@ -7,6 +7,7 @@ sys.path.append(project_root)
 
 # External imports
 import yaml
+import argparse
 
 # Internal imports
 from src.data.io import (
@@ -15,12 +16,18 @@ from src.data.io import (
 
 
 if __name__ == "__main__":
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config_path", type=str, default="configs/config.yaml", help="Config path")
+    args = parser.parse_args()
+    
+    
     # Command line arguments (revisit)
     season_id = "22023"
 
     # Extract from config (revisit)
     # Read configuration
-    with open('config.yaml', 'r') as file:
+    with open(args.config_path, 'r') as file:
         config = yaml.safe_load(file)
     CLEAN_DIR = config['clean_data_dir']
     DB_NAME = config['db_name']

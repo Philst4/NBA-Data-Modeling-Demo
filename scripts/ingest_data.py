@@ -6,6 +6,7 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(project_root)
 
 # External imports
+import argparse
 import yaml
 import pandas as pd
 
@@ -19,13 +20,18 @@ from src.data.ingesting import (
     ingest_from_leaguegamefinder
 )
 
-def main():
+def main(args):
     
     print("--- RUNNING DATA INGESTION SCRIPT ---")
     
     # (0) Read configuration
-    with open('config.yaml', 'r') as file:
+    with open(args.config_path, 'r') as file:
         config = yaml.safe_load(file)
+    
+    if not config['ingest_data']:
+        print(f"'{args.config_path}' specifies to not ingest data")
+        return
+    
     RAW_DATA_DIR = config['raw_data_dir']
     RAW_FILE_NAME = config['raw_filename']
     RAW_FILE_PATH = os.path.join(RAW_DATA_DIR, RAW_FILE_NAME)
@@ -83,4 +89,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config_path", type=str, default="configs/config.yaml", help="Path to config file")
+    args = parser.parse_args()
+    main(args)

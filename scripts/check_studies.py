@@ -15,9 +15,9 @@ import numpy as np
 # Internal imports 
 from src.utils import season_int_to_str
 
-def main():
+def main(args):
     # (0) Read in configuration
-    with open('config.yaml', 'r') as file:
+    with open(args.config_path, 'r') as file:
         config = yaml.safe_load(file)
     OPTUNA_STORAGE = config['optuna_storage']
 
@@ -73,4 +73,8 @@ def main():
 
     
 if __name__ == "__main__":
-    main()
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config_path", type=str, default="configs/config.yaml", help="Config path")
+    args = parser.parse_args()
+    main(args)

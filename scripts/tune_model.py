@@ -29,7 +29,7 @@ def main(args):
     """
     
     # Read configuration
-    with open('config.yaml', 'r') as file:
+    with open(args.config_path, 'r') as file:
         config = yaml.safe_load(file)
     CLEAN_DIR = config['clean_data_dir']    
     DB_NAME = config['db_name']
@@ -92,6 +92,7 @@ def main(args):
 if __name__ == "__main__":
     # Create argparser
     parser = argparse.ArgumentParser()
+    parser.add_argument("--config_path", type=str, default="configs/config.yaml", help="Config path")
     parser.add_argument("--modeling_config", type=str, default="lasso.py")
     parser.add_argument("--n_trials", type=int, default=1)
     parser.add_argument("--n_jobs", type=int, default=1, help="Used to parallelize building models ATM.")

@@ -20,7 +20,7 @@ from src.data.processing import (
 
 def main(args):
     # Read configuration
-    with open('config.yaml', 'r') as file:
+    with open(args.config_path, 'r') as file:
         config = yaml.safe_load(file)
     CLEAN_DIR = config['clean_data_dir']    
     DB_NAME = config['db_name']
@@ -57,6 +57,7 @@ def main(args):
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--config_path", type=str, default="configs/config.yaml", help="Config path")
     parser.add_argument('--window', type=int, default=0, help="Window to make rolling averages over")
     parser.add_argument('--normalize', type=bool, default=True, help="Whether or not the features should use normalized data (wrt season)")
 

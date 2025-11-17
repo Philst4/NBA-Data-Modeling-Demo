@@ -8,13 +8,20 @@ sys.path.append(project_root)
 # External imports
 import yaml
 import sqlite3
+import argparse
 
 # Internal imports
 from src.data.checks import check_db
 
 if __name__ == '__main__':
+    
+    # Specify config
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config_path", type=str, default="configs/config.yaml", help="Config path")
+    args = parser.parse_args()
+    
     # Read configuration
-    with open('config.yaml', 'r') as file:
+    with open(args.config_path, 'r') as file:
         config = yaml.safe_load(file)
     CLEAN_DIR = config['clean_data_dir']
     DB_NAME = config['db_name']

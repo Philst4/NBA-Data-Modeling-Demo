@@ -37,7 +37,7 @@ from src.model.training import (
 
 def main(args):
     # Read configuration
-    with open('config.yaml', 'r') as file:
+    with open(args.config_path, 'r') as file:
         config = yaml.safe_load(file)
     CLEAN_DATA_DIR = config['clean_data_dir']
     DB_NAME = config['db_name']
@@ -137,6 +137,7 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--config_path", type=str, default="configs/config.yaml", help="Config path")
     parser.add_argument("--modeling_config", type=str, default="lasso.py", help="Modeling config")
     parser.add_argument("--last_train_season", type=int, default=2024, help="Season to train the model up to (inclusive).")
     args = parser.parse_args()

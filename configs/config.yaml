@@ -2,6 +2,7 @@
 # For raw data
 raw_data_dir : "data/raw/"
 raw_filename : "raw.parquet"
+ingest_data : True
 
 # For main database
 clean_data_dir : "data/clean/"

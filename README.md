@@ -25,7 +25,8 @@ visualization via Flask/Streamlit.
     │
     ├── data/
     │   ├── raw/
-    │   │   └── raw.parquet
+    │   │   ├── raw_sample.parquet (Included)
+    │   │   └── raw.parquet (Generated if ingesting data)
     │   └── clean/
     │       └── cleaned_data.db
     │
@@ -57,7 +58,9 @@ visualization via Flask/Streamlit.
     │── optuna_studies.db
     ├── flask_app.py
     ├── streamlit_app.py
-    ├── config.yaml
+    ├── configs/
+    │   ├── config.yaml (default config; used if ingesting data)
+    │   ├── sample_config.yaml (config used if not ingesting data)
     └── environment.yml
 
 ------------------------------------------------------------------------

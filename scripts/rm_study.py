@@ -13,7 +13,7 @@ import optuna
 
 def main(args):
     # (0) Read in configuration
-    with open('config.yaml', 'r') as file:
+    with open(args.config_path, 'r') as file:
         config = yaml.safe_load(file)
     OPTUNA_STORAGE = config['optuna_storage']
     
@@ -26,6 +26,7 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--config_path", type=str, default="configs/config.yaml", help="Config path")
     parser.add_argument('study_name', type=str, help="Name of table to remove from clean database.")
     args = parser.parse_args()
     main(args)

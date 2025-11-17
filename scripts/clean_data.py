@@ -37,8 +37,12 @@ def clean_metadata(config):
     
     # (0) Read in configuration
     RAW_DIR = config['raw_data_dir']
-    RAW_FILE_NAME = config['raw_filename']
-    RAW_FILE_PATH = os.path.join(RAW_DIR, RAW_FILE_NAME)
+    RAW_FILENAME = config['raw_filename']
+    RAW_FILE_PATH = os.path.join(RAW_DIR, RAW_FILENAME)
+    if not os.path.exists(os.path.join(RAW_DIR, RAW_FILENAME)):
+        print(f"Raw file '{RAW_FILE_PATH}' from not found, make sure '{config}' specifies a valid 'raw_data_dir' and 'raw_filename'")
+        return
+        
     CLEAN_DIR = config['clean_data_dir']
     DB_NAME = config['db_name']
     
@@ -200,7 +204,7 @@ def clean_data(args, config):
         )
 
 def main(args):
-    with open('config.yaml', 'r') as file:
+    with open(args.config_path, 'r') as file:
         config = yaml.safe_load(file)
     clean_metadata(config)
     clean_data(args, config)
@@ -208,6 +212,7 @@ def main(args):
 if __name__ == "__main__":
     # (-1) Deal with arguments
     parser = argparse.ArgumentParser()
+    parser.add_argument("--config_path", type=str, default="configs/config.yaml", help="Config path")
     parser.add_argument("--w_norm_game_data", type=bool, default=True, help="Whether or not to normalize game data as well")
     args = parser.parse_args()
     

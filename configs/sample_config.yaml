@@ -1,0 +1,45 @@
+
+# For raw data
+raw_data_dir : "data/raw/"
+raw_filename : "raw_sample.parquet"
+ingest_data : False
+
+# For main database
+clean_data_dir : "data/clean/"
+db_name : "cleaned_data.db"
+
+metadata:
+  games :
+    table_name : 'game_metadata_sample'
+    columns : 
+      - UNIQUE_ID
+      - SEASON_ID
+      - IS_HOME
+      - GAME_ID
+      - GAME_DATE
+      - MATCHUP
+      - WL
+      - TEAM_ID
+      - TEAM_ABBREVIATION
+
+  teams : 
+    table_name : 'team_metadata_sample'
+    columns : 
+      - SEASON_ID
+      - TEAM_ID
+      - TEAM_ABBREVIATION
+      - TEAM_NAME
+
+main_table_name : 'game_data_sample'
+  
+# Modeling config
+modeling_config_dir: 'modeling_configs'
+
+# For optuna db
+optuna_storage : "sqlite:///optuna_studies.db"
+
+# Model storage
+model_storage : "models/" # Just a directory
+
+
+
