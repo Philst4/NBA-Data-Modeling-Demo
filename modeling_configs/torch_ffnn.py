@@ -93,5 +93,5 @@ n_epochs_space = ("int", {"low" : 1, "high" : 3})
 
 # Names
 model_name = "torch_ffnn"
-study_name = "torch_ffnn_study"
-model_filename = "torch_ffnn_weights.pth"
+model_filename = "pth" 
+# File will contain weights

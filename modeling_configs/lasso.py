@@ -16,5 +16,4 @@ n_train_seasons_space = ("int", {"low" : 1, "high" : 40}) # Number of training s
 
 # Names
 model_name = "lasso"
-study_name = "lasso_study"
-model_filename = "lasso_model.joblib"
+model_extension = "joblib"

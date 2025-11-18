@@ -1,3 +1,5 @@
+# Config name
+config_name : sample_config
 
 # For raw data
 raw_data_dir : "data/raw/"

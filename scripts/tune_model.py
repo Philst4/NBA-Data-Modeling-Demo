@@ -51,7 +51,10 @@ def main(args):
     )
     
     # Get modeling data
-    modeling_data, features, target = get_modeling_data(db_path=DB_PATH)
+    modeling_data, features, target = get_modeling_data(
+        db_path=DB_PATH,
+        config=config
+    )
     
     # Get device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -75,13 +78,17 @@ def main(args):
     
     # Make study (with seed)
     sampler = optuna.samplers.TPESampler(seed=42)
+    study_name = f"{modeling_config.model_name}_using_{config['config_name']}"
     study = optuna.create_study(
-        study_name=modeling_config.study_name,
+        study_name=study_name,
         direction="minimize",
         storage=OPTUNA_STORAGE,
         load_if_exists=True,
         sampler=sampler
     )
+    
+    # Set config as attribute for the study
+    study.set_user_attr("config", config)
     
     # Tune!
     study.optimize(objective, n_trials=n_trials, n_jobs=n_jobs)

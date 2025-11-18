@@ -1,17 +1,10 @@
 import optuna
 
 # Load in study
-def extract_best_model_hyperparams_from_study(modeling_config, optuna_storage):    
+def extract_best_model_hyperparams_from_study(study, modeling_config):    
     
     # Extract model class from modeling config
     model_class = modeling_config.model_class
-        
-    # Extract best hyperparams from study
-    study_name = modeling_config.study_name
-    study = optuna.load_study(
-        storage=optuna_storage,
-        study_name=study_name
-    )
     
     #print(f"Best hyperparams of '{model_class}' from '{study_name}':")
     #print(study.best_trial)

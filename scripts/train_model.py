@@ -58,24 +58,28 @@ def main(args):
     set_seed()
     
     # Load in study
+    study_name = f"{modeling_config.model_name}_using_{config['config_name']}"
     study = optuna.load_study(
         storage=OPTUNA_STORAGE,
-        study_name=modeling_config.study_name
+        study_name=study_name
     ) 
     
     # Extract model class from modeling config
     model_class = modeling_config.model_class
     
     # Extract best hyperparams from study
-    print(f"Best hyperparams of '{model_class}' from '{modeling_config.study_name}':")
+    print(f"Best hyperparams of '{model_class}' from '{study_name}':")
     print(study.best_trial)
     all_hyperparams = study.best_trial.params
     
     # Extract best model hyperperams from study
-    model_hyperparams = extract_best_model_hyperparams_from_study(modeling_config, OPTUNA_STORAGE)
+    model_hyperparams = extract_best_model_hyperparams_from_study(study, modeling_config)
     
     # Load in data, get training data
-    modeling_data, features, target = get_modeling_data(DB_PATH)
+    modeling_data, features, target = get_modeling_data(
+        DB_PATH,
+        config=config
+    )
     last_train_season = args.last_train_season
     n_train_seasons = all_hyperparams['n_train_seasons']
     train_condn1 = modeling_data['SEASON_ID'] - 20_000 <= last_train_season
@@ -86,7 +90,7 @@ def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     # Train the model
-    print(f"\nTraining '{model_class}' using best hyperparams from '{modeling_config.study_name}'...")
+    print(f"\nTraining '{model_class}' using best hyperparams from '{study_name}'...")
     if not issubclass(model_class, nn.Module):
         # For sklearn-style modeling setups
         model = train_sklearn(
@@ -128,7 +132,7 @@ def main(args):
     os.makedirs(MODEL_STORAGE, exist_ok=True)
     
     # Save the model
-    model_path = os.path.join(MODEL_STORAGE, modeling_config.model_filename)
+    model_path = os.path.join(MODEL_STORAGE, f"{study_name}.joblib")
     print(f"Saving model to '{model_path}'")
     if not isinstance(model, nn.Module):
         dump(model, model_path)

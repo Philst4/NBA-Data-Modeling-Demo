@@ -63,6 +63,7 @@ def query_db(db_path : str, query : str) -> pd.DataFrame:
 
 def get_modeling_data(
     db_path,
+    config,
     date=None,
     window=0
     ):
@@ -70,21 +71,25 @@ def get_modeling_data(
     Returns the modeling data, feature names, target name
     """
     
+    GAME_METADATA_TABLE_NAME = config['metadata']['games']['table_name']
+    GAME_DATA_NORM_TABLE_NAME = f"{config['main_table_name']}_norm"
+    GAME_DATA_NORM_PREV_TABLE_NAME = f"{config['main_table_name']}_norm_prev_{window}"
+    
     if not date:
-        game_metadata = query_db(db_path, "SELECT * FROM game_metadata")
-        game_data_norm = query_db(db_path, f"SELECT * FROM game_data_norm")
-        game_data_norm_prev = query_db(db_path, f"SELECT * FROM game_data_norm_prev_{window}")
+        game_metadata = query_db(db_path, f"SELECT * FROM {GAME_METADATA_TABLE_NAME}")
+        game_data_norm = query_db(db_path, f"SELECT * FROM {GAME_DATA_NORM_TABLE_NAME}")
+        game_data_norm_prev = query_db(db_path, f"SELECT * FROM {GAME_DATA_NORM_PREV_TABLE_NAME}")
     else:
         
         # Find the game_metadata from the specified date
-        game_metadata = query_db(db_path, f"SELECT * FROM game_metadata WHERE GAME_DATE = '{date}'")
+        game_metadata = query_db(db_path, f"SELECT * FROM {GAME_METADATA_TABLE_NAME} WHERE GAME_DATE = '{date}'")
         
         # Extract the proper UNIQUE_ID's from the date, use to query for relevant game_data + game_data_prev
         unique_ids = list(game_metadata['UNIQUE_ID'])
         
         # Query for data that has those UNIQUE_ID's
-        game_data_norm = query_db(db_path, f"SELECT * FROM game_data_norm WHERE UNIQUE_ID in {tuple(unique_ids)}")
-        game_data_norm_prev = query_db(db_path, f"SELECT * FROM game_data_norm_prev_{window} WHERE UNIQUE_ID in {tuple(unique_ids)}")
+        game_data_norm = query_db(db_path, f"SELECT * FROM {GAME_DATA_NORM_TABLE_NAME} WHERE UNIQUE_ID in {tuple(unique_ids)}")
+        game_data_norm_prev = query_db(db_path, f"SELECT * FROM {GAME_DATA_NORM_PREV_TABLE_NAME} WHERE UNIQUE_ID in {tuple(unique_ids)}")
     
     # Merge to get modeling data
     modeling_data = pd.merge(game_metadata, game_data_norm_prev, on='UNIQUE_ID')

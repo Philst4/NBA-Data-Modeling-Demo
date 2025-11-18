@@ -38,5 +38,4 @@ n_train_seasons_space = ("int", {"low" : 1, "high" : 1}) # Number of training se
 
 # Names
 model_name = "baseline_1"
-study_name = "baseline_1_study"
-model_filename = "baseline_1_model.joblib"
+model_extension = "joblib"
