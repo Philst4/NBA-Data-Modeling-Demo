@@ -41,4 +41,4 @@ n_train_seasons_space = ("int", {"low" : 1, "high" : 10}) # Number of training s
 
 # Names
 model_name = "lgbm"
-model_filename = "joblib"
+model_extension = "joblib"

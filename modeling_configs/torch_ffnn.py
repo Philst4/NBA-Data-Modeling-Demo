@@ -93,5 +93,5 @@ n_epochs_space = ("int", {"low" : 1, "high" : 3})
 
 # Names
 model_name = "torch_ffnn"
-model_filename = "pth" 
+model_extension = "pth" 
 # File will contain weights

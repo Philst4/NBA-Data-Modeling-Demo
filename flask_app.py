@@ -1,4 +1,5 @@
 import os
+import argparse
 import re
 import yaml
 import joblib
@@ -260,4 +261,6 @@ def index():
     )
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config_path", type=str, default="configs/config.yaml", help="Config path")
     app.run(debug=True)
