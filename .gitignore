@@ -8,9 +8,15 @@ __pycache__/
 *.venv
 nba/
 
-# Data + databases
-/data/
+# Data + databases; include raw sample
+/data
 *.db
+!data/raw/raw_sample.parquet
+
+# Include demo notebooks
+/notebooks
+!/notebooks/demo_colab.ipynb
+!/notebooks/demo_local.ipynb
 
 # Other to ignore (for now)
 dockerfile
