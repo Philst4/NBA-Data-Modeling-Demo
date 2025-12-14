@@ -59,7 +59,7 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config_path", type=str, default="configs/config.yaml", help="Config path")
+    parser.add_argument("--config_path", type=str, default=os.environ.get("CONFIG_PATH", "configs/config.yaml"), help="Config path")
     parser.add_argument("--study_name", type=str, default="lasso_study", help="Name of study to visualize")
     args = parser.parse_args()
     main(args)

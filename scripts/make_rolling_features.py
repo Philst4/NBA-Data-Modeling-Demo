@@ -57,7 +57,7 @@ def main(args):
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config_path", type=str, default="configs/config.yaml", help="Config path")
+    parser.add_argument("--config_path", type=str, default=os.environ.get("CONFIG_PATH", "configs/config.yaml"), help="Config path")
     parser.add_argument('--window', type=int, default=0, help="Window to make rolling averages over")
     parser.add_argument('--normalize', type=bool, default=True, help="Whether or not the features should use normalized data (wrt season)")
 

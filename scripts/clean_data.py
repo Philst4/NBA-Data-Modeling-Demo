@@ -212,7 +212,7 @@ def main(args):
 if __name__ == "__main__":
     # (-1) Deal with arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config_path", type=str, default="configs/config.yaml", help="Config path")
+    parser.add_argument("--config_path", type=str, default=os.environ.get("CONFIG_PATH", "configs/config.yaml"), help="Config path")
     parser.add_argument("--w_norm_game_data", type=bool, default=True, help="Whether or not to normalize game data as well")
     args = parser.parse_args()
     

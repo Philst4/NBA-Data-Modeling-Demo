@@ -4,7 +4,6 @@ import numpy as np
 from sklearn.metrics import (
     mean_absolute_error, 
     root_mean_squared_error,
-    r2_score,
     roc_auc_score,
 )
 import torch
@@ -49,7 +48,6 @@ def backtest(
         "val_season" : [],
         "mae" : [],
         "rmse" : [],
-        "r2" : [],
         "acc" : [],
         "roc_auc" : [],
         "time" : [],
@@ -139,7 +137,6 @@ def backtest(
         metrics['val_season'].append(val_season)
         metrics['mae'].append(mean_absolute_error(y_val, y_val_preds))
         metrics['rmse'].append(root_mean_squared_error(y_val, y_val_preds))
-        metrics['r2'].append(r2_score(y_val, y_val_preds))
         metrics['acc'].append(acc(y_val, y_val_preds))
         metrics['roc_auc'].append(
             roc_auc_score(
@@ -154,7 +151,6 @@ def backtest(
             print(f" -> Val Season: {metrics['val_season'][-1]}")
             print(f" -> MAE: {metrics['mae'][-1]:.3f}")
             print(f" -> RMSE: {metrics['rmse'][-1]:.3f}")
-            print(f" -> R^2 Score: {metrics['r2'][-1]:.3f}")
             print(f" -> Accuracy: {metrics['acc'][-1]:.3f}")
             print(f" -> ROC AUC Score: {metrics['roc_auc'][-1]:.3f}")
             print(f" -> Time to fit: {metrics['time'][-1]:3f} seconds")
@@ -165,7 +161,6 @@ def backtest(
         print(f"\n * Average Overall Metrics:")
         print(f" -> MAE: {np.mean(metrics['mae']):.3f}")
         print(f" -> RMSE: {np.mean(metrics['rmse']):.3f}")
-        print(f" -> R^2 Score: {np.mean(metrics['r2']):.3f}")
         print(f" -> Accuracy: {np.mean(metrics['acc']):.3f}")
         print(f" -> ROC AUC Score: {np.mean(metrics['roc_auc']):.3f}")
         print(f" -> Time to fit: {np.mean(metrics['time']):3f} seconds")

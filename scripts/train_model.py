@@ -68,7 +68,7 @@ def main(args):
     model_class = modeling_config.model_class
     
     # Extract best hyperparams from study
-    print(f"Best hyperparams of '{model_class}' from '{study_name}':")
+    print(f"Best hyperparams of '{model_class}' from study '{study_name}':")
     print(study.best_trial)
     all_hyperparams = study.best_trial.params
     
@@ -132,7 +132,10 @@ def main(args):
     os.makedirs(MODEL_STORAGE, exist_ok=True)
     
     # Save the model
-    model_path = os.path.join(MODEL_STORAGE, f"{study_name}.joblib")
+    if not args.model_filename:
+        model_path = os.path.join(MODEL_STORAGE, f"{study_name}.{modeling_config.model_extension}")
+    else:
+        model_path = os.path.join(MODEL_STORAGE, args.model_filename)
     print(f"Saving model to '{model_path}'")
     if not isinstance(model, nn.Module):
         dump(model, model_path)
@@ -141,8 +144,10 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config_path", type=str, default="configs/config.yaml", help="Config path")
+    parser.add_argument("--config_path", type=str, default=os.environ.get("CONFIG_PATH", "configs/config.yaml"), help="Config path")
     parser.add_argument("--modeling_config", type=str, default="lasso.py", help="Modeling config")
     parser.add_argument("--last_train_season", type=int, default=2024, help="Season to train the model up to (inclusive).")
+    parser.add_argument("--model_filename", type=str, default="", help="What to name model file. Overrides name specs in modeling_config if provided. Include extension")
+    
     args = parser.parse_args()
     main(args)
