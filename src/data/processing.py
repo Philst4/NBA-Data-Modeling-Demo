@@ -22,7 +22,8 @@ def get_normalized_by_season(
 
 def get_normalized_by_season(
     game_data: pd.DataFrame,
-    game_metadata: pd.DataFrame
+    game_metadata: pd.DataFrame,
+    use_prev_season_to_scale=True
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Returns
@@ -61,6 +62,62 @@ def get_normalized_by_season(
 
     # drop SEASON_ID to match original output style
     game_data_normalized = game_data.drop('SEASON_ID', axis=1)
+
+    return game_data_normalized, game_data_means_stds
+
+def get_normalized_by_season(
+    game_data: pd.DataFrame,
+    game_metadata: pd.DataFrame,
+    use_prev_season_to_scale: bool = True
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+
+    game_data = game_data.copy()
+    meta = game_metadata[['UNIQUE_ID', 'SEASON_ID']].copy()
+    game_data = game_data.merge(meta, on='UNIQUE_ID')
+
+    cols_to_normalize = [
+        c for c in game_data.columns
+        if c not in ('UNIQUE_ID', 'SEASON_ID')
+    ]
+
+    # --- raw per-season stats ---
+    season_stats = (
+        game_data
+        .groupby('SEASON_ID')[cols_to_normalize]
+        .agg(['mean', 'std'])
+    )
+
+    # --- stats used for scaling ---
+    if use_prev_season_to_scale:
+        scaling_stats = season_stats.shift(1)
+
+        # first season falls back to its own stats
+        first_season = season_stats.index[0]
+        scaling_stats.loc[first_season] = season_stats.loc[first_season]
+    else:
+        scaling_stats = season_stats
+
+    means = scaling_stats.xs('mean', level=1, axis=1)
+    stds  = scaling_stats.xs('std', level=1, axis=1)
+
+    # --- normalize ---
+    def scale_season(df):
+        season = df.name
+        return (df - means.loc[season]) / stds.loc[season]
+
+    game_data[cols_to_normalize] = (
+        game_data
+        .groupby('SEASON_ID', group_keys=False)[cols_to_normalize]
+        .apply(scale_season)
+    )
+
+    game_data_normalized = game_data.drop(columns='SEASON_ID')
+
+    # --- format raw stats for return ---
+    scaling_stats.columns = [
+        f"{col}_{stat}" for col, stat in scaling_stats.columns
+    ]
+    game_data_means_stds = scaling_stats.reset_index()
 
     return game_data_normalized, game_data_means_stds
 
