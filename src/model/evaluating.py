@@ -42,7 +42,7 @@ def backtest(
     """
     Accumulates metrics of models trained/validated on specified train-val splits.
     """
-    
+
     # Dictionary to store metrics
     metrics = {
         "val_season" : [],

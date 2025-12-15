@@ -51,7 +51,7 @@ def main(args):
     )
     
     # Get modeling data
-    modeling_data, features, target = get_modeling_data(
+    modeling_data, features, target, target_means_stds = get_modeling_data(
         db_path=DB_PATH,
         config=config
     )

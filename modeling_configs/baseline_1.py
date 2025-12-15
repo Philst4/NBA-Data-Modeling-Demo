@@ -23,7 +23,8 @@ class Baseline1():
         col = X[self.home_feature]
         # Ensure it works whether column is boolean, 0/1, or string flags
         # True/1/'home' => 1 ; False/0/other => -1
-        return np.where(col > 0, self.C, -self.C)
+        smooth_preds = np.where(col > 0, self.C, -self.C)
+        return smooth_preds    
 
 model_class = Baseline1
 model_hyperparam_space = {"C": ("float", {"low" : 0.0, "high" : 2.0}),}

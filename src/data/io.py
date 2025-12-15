@@ -65,14 +65,16 @@ def get_modeling_data(
     db_path,
     config,
     date=None,
-    window=0
+    window=0,
+    w_target_means_stds=True
     ):
     """
     Returns the modeling data, feature names, target name
     """
     
     GAME_METADATA_TABLE_NAME = config['metadata']['games']['table_name']
-    GAME_DATA_NORM_TABLE_NAME = f"{config['main_table_name']}_norm"
+    GAME_DATA_TABLE_NAME =f"{config['main_table_name']}"
+    GAME_DATA_NORM_TABLE_NAME = GAME_DATA_TABLE_NAME + '_norm'
     GAME_DATA_NORM_PREV_TABLE_NAME = f"{config['main_table_name']}_norm_prev_{window}"
     
     if not date:
@@ -100,4 +102,14 @@ def get_modeling_data(
     features = ['IS_HOME_for', 'IS_HOME_ag'] + rolling_avg_feature_names
     target = 'PLUS_MINUS_for'
     
-    return modeling_data, features, target
+    target_means_stds = None
+    
+    if w_target_means_stds:
+        means_stds = query_db(db_path, f"SELECT * FROM {GAME_DATA_TABLE_NAME}_means_stds")
+        seasons = modeling_data['SEASON_ID'].unique()
+        target_means_stds = means_stds.loc[
+            means_stds['SEASON_ID'].isin(seasons), 
+            ['SEASON_ID', target + '_mean', target + '_std']
+        ]
+    
+    return modeling_data, features, target, target_means_stds

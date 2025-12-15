@@ -111,7 +111,7 @@ def main(args):
     )
     
     # Load in modeling data using date
-    modeling_data, features, target = get_modeling_data(DB_PATH, selected_date)
+    modeling_data, features, target, _ = get_modeling_data(DB_PATH, selected_date)
     modeling_data = modeling_data.sort_values(by=['UNIQUE_ID'])
 
     # Only keep one side of matchup

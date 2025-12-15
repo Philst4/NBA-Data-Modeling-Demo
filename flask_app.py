@@ -38,7 +38,7 @@ MAX_DATE = date.today()
 DEFAULT_DATE = date(2025, 4, 13) # Don't change.
 
 # Sample data to get model input dim
-_, features, _ = get_modeling_data(DB_PATH, DEFAULT_DATE)
+_, features, _, _ = get_modeling_data(DB_PATH, DEFAULT_DATE)
 INPUT_DIM = len(features)
 
 # Cache to avoid recomputations
