@@ -76,7 +76,7 @@ def main(args):
     model_hyperparams = extract_best_model_hyperparams_from_study(study, modeling_config)
     
     # Load in data, get training data
-    modeling_data, features, target = get_modeling_data(
+    modeling_data, features, target, _ = get_modeling_data(
         DB_PATH,
         config=config
     )

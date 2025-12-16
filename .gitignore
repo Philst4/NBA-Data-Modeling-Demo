@@ -12,6 +12,7 @@ nba/
 /data
 *.db
 !data/raw/raw_sample.parquet
+/models
 
 # Include demo notebooks
 /notebooks
