@@ -41,3 +41,50 @@ def load_modeling_config(config_path):
             setattr(config, var, None) 
 
     return config
+
+
+import importlib
+from pathlib import Path
+
+def load_modeling_config(modeling_config_path: str):
+    """
+    Load a modeling config as a proper Python module.
+
+    Parameters
+    ----------
+    modeling_config_path : str
+        e.g.
+        - "modeling_configs/baseline_1.py"
+        - "src/modeling_configs/baseline_1.py"
+        - "modeling_configs/baseline_1"
+    """
+    path = Path(modeling_config_path)
+
+    # Drop extension if present
+    path = path.with_suffix("")
+
+    # Build module path from path parts
+    module_path = ".".join(path.parts)
+
+    try:
+        config = importlib.import_module(module_path)
+    except ModuleNotFoundError as e:
+        raise ModuleNotFoundError(
+            f"Could not import modeling config '{module_path}'. "
+            f"Ensure the project root is on PYTHONPATH and "
+            f"'{path.parent}' is a Python package."
+        ) from e
+
+    # Validate required variables
+    missing_vars = [v for v in REQUIRED_CONFIG_VARS if not hasattr(config, v)]
+    if missing_vars:
+        raise ValueError(
+            f"Modeling config '{module_path}' is missing required variables: {missing_vars}"
+        )
+
+    # Add torch config variables as None if missing
+    for v in TORCH_CONFIG_VARS:
+        if not hasattr(config, v):
+            setattr(config, v, None)
+
+    return config
