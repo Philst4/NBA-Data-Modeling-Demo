@@ -33,3 +33,44 @@ def discretizing_activation_fn(smooth_preds, target_std):
     )
 
     return discrete * interval
+
+
+
+def discretizing_activation_fn2(smooth_preds, target_std):
+    """
+    Rounds smooth predictions according to a custom rule:
+    
+    - If the absolute value of the prediction is less than one interval,
+      round away from 0.
+    - Otherwise, round to the nearest interval.
+    
+    Parameters
+    ----------
+    smooth_preds : array-like
+        Continuous predictions (scaled).
+    target_std : float
+        Standard deviation of original scale.
+        
+    Returns
+    -------
+    discrete_preds : np.ndarray
+        Discretized values according to the rule.
+    """
+    smooth_preds = np.asarray(smooth_preds)
+    interval = 1 / target_std
+
+    # Compute scaled predictions in terms of intervals
+    scaled = smooth_preds / interval
+
+    # Apply rounding rules
+    discrete = np.where(
+        (scaled > 0) & (scaled < 1),
+        1,  # round away from 0 for small positive
+        np.where(
+            (scaled < 0) & (scaled > -1),
+            -1,  # round away from 0 for small negative
+            np.round(scaled)  # otherwise, round to nearest interval
+        )
+    )
+
+    return discrete * interval
