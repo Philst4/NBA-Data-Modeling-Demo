@@ -8,6 +8,7 @@ sys.path.append(project_root)
 
 # External imports
 import yaml
+import pandas as pd
 
 # Internal imports
 from src.data.io import (
@@ -15,8 +16,9 @@ from src.data.io import (
     save_to_db
 )
 from src.data.processing import (
+    get_temporal_spatial_features,
     get_rolling_avgs,
-    get_rolling_avg_diffs
+    add_rolling_avg_diffs
 )
 
 def main(args):
@@ -36,6 +38,31 @@ def main(args):
     else:
         game_data = query_db(DB_PATH, f"SELECT * from {MAIN_TABLE_NAME}_norm")
     
+    
+    # Get temporal-spatial features, save
+    temporal_spatial = get_temporal_spatial_features(
+        game_metadata
+    )
+    save_to_db(
+        temporal_spatial.sort_values(by=['UNIQUE_ID']), 
+        CLEAN_DIR,
+        DB_NAME,
+        "temporal_spatial"
+    )
+    
+    # Get rolling temporal-spatial features
+    temporal_spatial_rolling = get_rolling_avgs(
+        temporal_spatial,
+        game_metadata,
+        windows=[args.window]
+    )
+    save_to_db(
+        temporal_spatial_rolling.sort_values(by=['UNIQUE_ID']),
+        CLEAN_DIR,
+        DB_NAME,
+        "temporal_spatial_rolling"
+    )
+    
     # Get rolling averages
     game_data_rolling_avgs = get_rolling_avgs(
         game_data=game_data,
@@ -44,11 +71,11 @@ def main(args):
     )
     
     # Add rolling average differences
-    game_data_rolling_avgs = get_rolling_avg_diffs(
+    game_data_rolling_avgs = add_rolling_avg_diffs(
         game_data_rolling_avgs
     )
-    
-    # Save to database
+     
+    # Save rolling to database
     suffix = "_"
     if args.normalize:
         suffix += "norm_"

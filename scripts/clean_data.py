@@ -145,6 +145,7 @@ def clean_data(args, config):
     
     # (1) Read in raw data, drop unneeded
     games = read_from_parquet(RAW_FILE_PATH)
+    games['GAME_WON'] = games['WL'].map({'W' : 1, 'L' : 0})
     drop_cols(games, COLS_TO_DROP_A)
     
     # (2) Convert types (revisit)

@@ -81,6 +81,8 @@ def get_modeling_data(
         game_metadata = query_db(db_path, f"SELECT * FROM {GAME_METADATA_TABLE_NAME}")
         game_data_norm = query_db(db_path, f"SELECT * FROM {GAME_DATA_NORM_TABLE_NAME}")
         game_data_norm_prev = query_db(db_path, f"SELECT * FROM {GAME_DATA_NORM_PREV_TABLE_NAME}")
+        temporal_spatial = query_db(db_path, f"SELECT * FROM temporal_spatial")
+        temporal_spatial_rolling = query_db(db_path, f"SELECT * FROM temporal_spatial_rolling")
     else:
         
         # Find the game_metadata from the specified date
@@ -92,14 +94,38 @@ def get_modeling_data(
         # Query for data that has those UNIQUE_ID's
         game_data_norm = query_db(db_path, f"SELECT * FROM {GAME_DATA_NORM_TABLE_NAME} WHERE UNIQUE_ID in {tuple(unique_ids)}")
         game_data_norm_prev = query_db(db_path, f"SELECT * FROM {GAME_DATA_NORM_PREV_TABLE_NAME} WHERE UNIQUE_ID in {tuple(unique_ids)}")
+        temporal_spatial = query_db(db_path, f"SELECT * FROM temporal_spatial WHERE UNIQUE_ID in {tuple(unique_ids)}")
+        temporal_spatial_rolling = query_db(db_path, f"SELECT * FROM temporal_spatial_rolling WHERE UNIQUE_ID in {tuple(unique_ids)}")
+    
     
     # Merge to get modeling data
-    modeling_data = pd.merge(game_metadata, game_data_norm_prev, on='UNIQUE_ID')
-    modeling_data = pd.merge(modeling_data, game_data_norm[['UNIQUE_ID', 'IS_HOME_for', 'IS_HOME_ag', 'PLUS_MINUS_for']], on='UNIQUE_ID')
+    modeling_data = pd.merge(
+        game_metadata, 
+        game_data_norm_prev, 
+        on='UNIQUE_ID'
+    )
+    modeling_data = pd.merge(
+        modeling_data, 
+        game_data_norm[['UNIQUE_ID', 'IS_HOME_for', 'IS_HOME_ag', 'PLUS_MINUS_for']]
+        , on='UNIQUE_ID'
+    )
+    
+    modeling_data = pd.merge(
+        modeling_data,
+        temporal_spatial,
+        on='UNIQUE_ID'
+    )
+    
+    modeling_data = pd.merge(
+        modeling_data,
+        temporal_spatial_rolling,
+        on='UNIQUE_ID'
+    )
     
     # Get features + target
-    rolling_avg_feature_names = [col for col in list(game_data_norm_prev.columns) if col != 'UNIQUE_ID']
-    features = ['IS_HOME_for', 'IS_HOME_ag'] + rolling_avg_feature_names
+    features = [col for col in list(game_data_norm_prev.columns) if col != 'UNIQUE_ID']
+    features += [col for col in list(temporal_spatial.columns) if col != 'UNIQUE_ID']
+    features += [col for col in list(temporal_spatial_rolling.columns) if col != 'UNIQUE_ID']
     target = 'PLUS_MINUS_for'
     
     target_means_stds = None

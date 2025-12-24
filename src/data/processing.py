@@ -2,70 +2,6 @@
 import pandas as pd
 
 def get_normalized_by_season(
-        game_data : pd.DataFrame,
-        game_metadata : pd.DataFrame
-    ) -> pd.DataFrame:
-    
-    game_data = game_data.copy()
-    game_metadata = game_metadata[['UNIQUE_ID', 'SEASON_ID']].copy()
-
-    game_data = pd.merge(game_metadata, game_data, on='UNIQUE_ID')
-
-    # List of columns to normalize (excluding identifiers)
-    cols_to_normalize = [col for col in game_data.columns if col not in ('UNIQUE_ID', 'SEASON_ID')]
-
-    # Normalize each column by SEASON_ID
-    game_data[cols_to_normalize] = game_data.groupby('SEASON_ID')[cols_to_normalize].transform(
-        lambda x: (x - x.mean()) / x.std()
-    )
-    return game_data.drop('SEASON_ID', axis=1)  # Return normalized data without the SEASON_ID column
-
-def get_normalized_by_season(
-    game_data: pd.DataFrame,
-    game_metadata: pd.DataFrame,
-    use_prev_season_to_scale=True
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Returns
-    -------
-    game_data_normalized : pd.DataFrame
-        game_data normalized per season (z-score).
-    game_data_means_stds : pd.DataFrame
-        Per-season means and stds for each column that was normalized.
-        Columns are <stat>_mean and <stat>_std.
-    """
-    game_data = game_data.copy()
-    meta = game_metadata[['UNIQUE_ID', 'SEASON_ID']].copy()
-
-    # merge to bring SEASON_ID into game_data
-    game_data = pd.merge(meta, game_data, on='UNIQUE_ID')
-
-    cols_to_normalize = [
-        col for col in game_data.columns
-        if col not in ('UNIQUE_ID', 'SEASON_ID')
-    ]
-
-    # --- compute per-season means and stds once ---
-    agg = game_data.groupby('SEASON_ID')[cols_to_normalize].agg(['mean', 'std'])
-
-    # Flatten MultiIndex columns to "<col>_mean" / "<col>_std"
-    agg.columns = [f"{col}_{stat}" for col, stat in agg.columns]
-    game_data_means_stds = agg.reset_index()
-
-    # --- normalize using those season stats ---
-    # (x - mean) / std for each season
-    game_data[cols_to_normalize] = (
-        game_data
-        .groupby('SEASON_ID')[cols_to_normalize]
-        .transform(lambda x: (x - x.mean()) / x.std())
-    )
-
-    # drop SEASON_ID to match original output style
-    game_data_normalized = game_data.drop('SEASON_ID', axis=1)
-
-    return game_data_normalized, game_data_means_stds
-
-def get_normalized_by_season(
     game_data: pd.DataFrame,
     game_metadata: pd.DataFrame,
     use_prev_season_to_scale: bool = True
@@ -218,7 +154,7 @@ def get_rolling_avgs(
 
     return final_rolling_avgs
 
-def get_rolling_avg_diffs(df):
+def add_rolling_avg_diffs(df):
     """
     'STAT_diff_for_prev_0' is 'STAT_for_prev_0' - 'STAT_ag_opp_prev_0'
     'STAT_diff_ag_prev_0' is 'STAT_ag_prev_0' - 'STAT_ag_opp_prev_0'
@@ -244,3 +180,133 @@ def get_rolling_avg_diffs(df):
     df[diff_ag_cols] = diff_ag
 
     return df
+
+import pandas as pd
+import numpy as np
+
+def get_temporal_spatial_features(game_metadata: pd.DataFrame) -> pd.DataFrame:
+    """
+    Creates basic temporal and spatial features from game metadata.
+    
+    Returns per-row features:
+        - B2B_for, B2B_ag
+        - 3of4_for, 3of4_ag
+        - travelled_for, travelled_ag
+        - IS_HOME_for, IS_HOME_ag
+        - UNIQUE_ID
+    """
+
+    df = game_metadata.copy()
+
+    # Ensure datetime
+    df["GAME_DATE"] = pd.to_datetime(df["GAME_DATE"])
+
+    # Sort for temporal ops
+    df = df.sort_values(["NEW_TEAM_ID_for", "GAME_DATE"])
+
+    # --- TEMPORAL FEATURES (FOR TEAM) ---------------------------------------
+
+    # Days since last game for the for-team
+    df["days_since_last_for"] = (
+        df.groupby("NEW_TEAM_ID_for")["GAME_DATE"]
+          .diff()
+          .dt.days
+    )
+
+    df["B2B_for"] = (df["days_since_last_for"] == 1).astype(int)
+
+    # Count games in previous 3 days (inclusive window size = 4 days)
+    def games_last_3_days(dates):
+        return [
+            (dates >= d - pd.Timedelta(days=3)).sum() - 1
+            for d in dates
+        ]
+
+    df["games_last_3_days_for"] = (
+        df.groupby("NEW_TEAM_ID_for")["GAME_DATE"]
+          .transform(games_last_3_days)
+    )
+
+    df["3of4_for"] = (df["games_last_3_days_for"] >= 2).astype(int)
+
+    # --- TEMPORAL FEATURES (AG TEAM) ----------------------------------------
+    # Since each game appears twice, we can self-join on GAME_ID
+
+    ag_features = df[[
+        "GAME_ID",
+        "NEW_TEAM_ID_for",
+        "B2B_for",
+        "3of4_for"
+    ]].rename(columns={
+        "NEW_TEAM_ID_for": "NEW_TEAM_ID_ag",
+        "B2B_for": "B2B_ag",
+        "3of4_for": "3of4_ag"
+    })
+
+    df = df.merge(
+        ag_features,
+        on=["GAME_ID", "NEW_TEAM_ID_ag"],
+        how="left"
+    )
+
+    # --- SPATIAL FEATURES (TRAVEL) ------------------------------------------
+
+    # Previous game info for for-team
+    df["prev_IS_HOME_for"] = (
+        df.groupby("NEW_TEAM_ID_for")["IS_HOME"]
+          .shift(1)
+    )
+
+    df["prev_TEAM_ID_ag"] = (
+        df.groupby("NEW_TEAM_ID_for")["NEW_TEAM_ID_ag"]
+          .shift(1)
+    )
+
+    def travelled_for(row):
+        if pd.isna(row["prev_IS_HOME_for"]):
+            return 0
+        # Home -> Away or Away -> Home
+        if row["IS_HOME"] != row["prev_IS_HOME_for"]:
+            return 1
+        # Away -> Away, check opponent city
+        if row["IS_HOME"] == 0:
+            return int(row["NEW_TEAM_ID_ag"] != row["prev_TEAM_ID_ag"])
+        # Home -> Home
+        return 0
+
+    df["travelled_for"] = df.apply(travelled_for, axis=1)
+
+    # Mirror travelled_for for opponent
+    ag_travel = df[[
+        "GAME_ID",
+        "NEW_TEAM_ID_for",
+        "travelled_for"
+    ]].rename(columns={
+        "NEW_TEAM_ID_for": "NEW_TEAM_ID_ag",
+        "travelled_for": "travelled_ag"
+    })
+
+    df = df.merge(
+        ag_travel,
+        on=["GAME_ID", "NEW_TEAM_ID_ag"],
+        how="left"
+    )
+
+    # --- HOME FLAGS ----------------------------------------------------------
+
+    df["IS_HOME_for"] = df["IS_HOME"].astype(int)
+    df["IS_HOME_ag"] = (1 - df["IS_HOME"]).astype(int)
+
+    # --- RETURN --------------------------------------------------------------
+
+    return df[[
+        "UNIQUE_ID",
+        "IS_HOME_for",
+        "IS_HOME_ag",
+        "B2B_for",
+        "B2B_ag",
+        "3of4_for",
+        "3of4_ag",
+        "travelled_for",
+        "travelled_ag"
+    ]]
