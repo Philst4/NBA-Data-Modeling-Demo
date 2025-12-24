@@ -106,8 +106,8 @@ def get_modeling_data(
     )
     modeling_data = pd.merge(
         modeling_data, 
-        game_data_norm[['UNIQUE_ID', 'IS_HOME_for', 'IS_HOME_ag', 'PLUS_MINUS_for']]
-        , on='UNIQUE_ID'
+        game_data_norm[['UNIQUE_ID', 'PLUS_MINUS_for']], 
+        on='UNIQUE_ID'
     )
     
     modeling_data = pd.merge(

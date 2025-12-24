@@ -162,6 +162,7 @@ def clean_data(args, config):
         cols_not_to_mirror=['UNIQUE_ID', 'GAME_ID']
     )
     drop_cols(games, COLS_TO_DROP_C)
+    games = games.drop(columns=games.filter(like='IS_HOME'))
     
     # (5) Data-specific cleaning processes
     fill_plus_minus(games)
