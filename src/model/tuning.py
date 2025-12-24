@@ -43,6 +43,8 @@ def make_backtest_objective(
     modeling_data, 
     features, 
     target,
+    target_means_stds,
+    target_is_normalized,
     val_seasons,
     n_train_seasons_space,
     objective_fn,
@@ -51,7 +53,7 @@ def make_backtest_objective(
     optimizer_hyperparam_space=None,
     n_epochs_space=None,
     device=None,
-    verbose=True
+    verbose=True,
     
 ):
     """
@@ -92,6 +94,8 @@ def make_backtest_objective(
             modeling_data, 
             features, 
             target, 
+            target_means_stds,
+            target_is_normalized,
             val_seasons,
             n_train_seasons,
             objective_fn,
@@ -100,7 +104,7 @@ def make_backtest_objective(
             optimizer_hyperparams,
             n_epochs,
             device,
-            verbose=True
+            verbose=True,
         )
         
         # Log metrics as user attributes

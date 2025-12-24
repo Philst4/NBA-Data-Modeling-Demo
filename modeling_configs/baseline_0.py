@@ -22,6 +22,7 @@ objective_fn = root_mean_squared_error
 val_seasons = [2020, 2021, 2022, 2023, 2024]
 
 n_train_seasons_space = ("int", {"low" : 1, "high" : 1}) # Number of training seasons to use
+w_norm_data = True
 
 # NOTE: hyperparam space will be dict[str, tuple],
 # where the tuple is (type of hyperparam, key_word_args)

@@ -90,6 +90,7 @@ optimizer_hyperparam_space = {
     "lr" : ("float", {"low" : 1e-4, "high" : 1e-2, "log" : True})
 }
 n_epochs_space = ("int", {"low" : 1, "high" : 3})
+w_norm_data = True
 
 # Names
 model_name = "torch_ffnn"

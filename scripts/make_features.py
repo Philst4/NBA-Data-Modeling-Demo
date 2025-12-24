@@ -33,7 +33,7 @@ def main(args):
 
     game_metadata = query_db(DB_PATH, f"SELECT * from {METADATA_TABLE_NAME}")
     
-    if not args.normalize:
+    if not args.normalized:
         game_data = query_db(DB_PATH, f"SELECT * from {MAIN_TABLE_NAME}")
     else:
         game_data = query_db(DB_PATH, f"SELECT * from {MAIN_TABLE_NAME}_norm")
@@ -77,7 +77,7 @@ def main(args):
      
     # Save rolling to database
     suffix = "_"
-    if args.normalize:
+    if args.normalized:
         suffix += "norm_"
     suffix += "prev_" + str(args.window)
     
@@ -92,7 +92,18 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config_path", type=str, default=os.environ.get("CONFIG_PATH", "configs/config.yaml"), help="Config path")
     parser.add_argument('--window', type=int, default=0, help="Window to make rolling averages over")
-    parser.add_argument('--normalize', type=bool, default=True, help="Whether or not the features should use normalized data (wrt season)")
+    parser.add_argument(
+        "--normalized",
+        action="store_true",
+        default=True,
+        help="Use normalized data"
+    )
+    parser.add_argument(
+        "--not-normalized",
+        dest="normalized",
+        action="store_false",
+        help="Disable normalization"
+    )
 
     args = parser.parse_args()
     main(args)

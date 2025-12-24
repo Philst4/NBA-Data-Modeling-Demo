@@ -29,6 +29,8 @@ def backtest(
     modeling_data, 
     features, 
     target, 
+    target_means_stds,
+    target_is_normalized,
     val_seasons,
     n_train_seasons,
     objective_fn,
@@ -37,7 +39,7 @@ def backtest(
     optimizer_hyperparams=None,
     n_epochs=None,
     device=None,
-    verbose=True
+    verbose=True,
 ):
     """
     Accumulates metrics of models trained/validated on specified train-val splits.
@@ -46,8 +48,12 @@ def backtest(
     # Dictionary to store metrics
     metrics = {
         "val_season" : [],
-        "mae" : [],
-        "rmse" : [],
+        "target_means" : [],
+        "target_stds" : [],
+        "mae_scaled" : [],
+        "mae_unscaled" : [],
+        "rmse_scaled" : [],
+        "rmse_unscaled" : [],
         "acc" : [],
         "roc_auc" : [],
         "time" : [],
@@ -63,11 +69,12 @@ def backtest(
         iter_start_time = time()
         
         # Get train-val split
-        train_condn1 = modeling_data['SEASON_ID'] - 20_000 < val_season
-        train_condn2 = val_season - (modeling_data['SEASON_ID'] - 20_000) <= n_train_seasons
+        val_season_id = 20_000 + val_season
+        train_condn1 = modeling_data['SEASON_ID'] < val_season_id
+        train_condn2 = val_season_id - modeling_data['SEASON_ID'] <= n_train_seasons
         training_data = modeling_data.loc[train_condn1 & train_condn2, :]
         
-        val_condn = modeling_data['SEASON_ID'] - 20_000 == val_season
+        val_condn = modeling_data['SEASON_ID'] == val_season_id
         val_data = modeling_data.loc[val_condn, :]
         
         assert len(training_data) > 0, f"No training data when val_season={val_season}"
@@ -130,13 +137,52 @@ def backtest(
             
         
         # Evaluate the model on the validation data
-        metrics['score'].append(score)
-        
         iter_end_time = time()
-
+        metrics['score'].append(score)        
         metrics['val_season'].append(val_season)
-        metrics['mae'].append(mean_absolute_error(y_val, y_val_preds))
-        metrics['rmse'].append(root_mean_squared_error(y_val, y_val_preds))
+        
+        mean = target_means_stds.loc[target_means_stds['SEASON_ID'] == val_season_id, target + '_mean'].values.item()
+        std = target_means_stds.loc[target_means_stds['SEASON_ID'] == val_season_id, target + '_std'].values.item()
+        metrics['target_means'].append(mean)
+        metrics['target_stds'].append(std)
+        
+        if not target_is_normalized:
+            
+            unscaled_y_val = y_val
+            unscaled_y_val_preds = y_val_preds
+            scaled_y_val = (y_val - mean) / std
+            scaled_y_val_preds = (y_val_preds - mean) / std
+            
+        else:
+            unscaled_y_val = (std * y_val) + mean
+            unscaled_y_val_preds = (std * y_val_preds) + mean
+            scaled_y_val = y_val
+            scaled_y_val_preds = y_val_preds
+            
+        metrics['mae_unscaled'].append(
+            mean_absolute_error(
+                unscaled_y_val, 
+                unscaled_y_val_preds
+            )
+        )
+        metrics['rmse_unscaled'].append(
+            root_mean_squared_error(
+                unscaled_y_val, 
+                unscaled_y_val_preds
+            )
+        )
+        metrics['mae_scaled'].append(
+            mean_absolute_error(
+                scaled_y_val, 
+                scaled_y_val_preds
+            )
+        )
+        metrics['rmse_scaled'].append(
+            root_mean_squared_error(
+                scaled_y_val, 
+                scaled_y_val_preds
+            )
+        )
         metrics['acc'].append(acc(y_val, y_val_preds))
         metrics['roc_auc'].append(
             roc_auc_score(
@@ -147,10 +193,12 @@ def backtest(
         metrics['time'].append(iter_end_time - iter_start_time)
         
         if verbose:
+            
             # Print metrics
             print(f" -> Val Season: {metrics['val_season'][-1]}")
-            print(f" -> MAE: {metrics['mae'][-1]:.3f}")
-            print(f" -> RMSE: {metrics['rmse'][-1]:.3f}")
+            print(f" -> Target Mean/STD: {metrics['target_means'][-1]:.3f}; {metrics['target_stds'][-1]:.3f}")
+            print(f" -> MAE Scaled/Unscaled: {metrics['mae_scaled'][-1]:.3f}; {metrics['mae_unscaled'][-1]:.3f} ")
+            print(f" -> RMSE Scaled/Unscaled: {metrics['rmse_scaled'][-1]:.3f}; {metrics['rmse_unscaled'][-1]:.3f} ")
             print(f" -> Accuracy: {metrics['acc'][-1]:.3f}")
             print(f" -> ROC AUC Score: {metrics['roc_auc'][-1]:.3f}")
             print(f" -> Time to fit: {metrics['time'][-1]:3f} seconds")
@@ -159,8 +207,9 @@ def backtest(
     if verbose:
         # Print overall metrics
         print(f"\n * Average Overall Metrics:")
-        print(f" -> MAE: {np.mean(metrics['mae']):.3f}")
-        print(f" -> RMSE: {np.mean(metrics['rmse']):.3f}")
+        print(f" -> Target Mean/STD: {np.mean(metrics['target_means']):.3f}; {np.mean(metrics['target_stds']):.3f}")
+        print(f" -> MAE Scaled/Unscaled: {np.mean(metrics['mae_scaled']):.3f}; {np.mean(metrics['mae_unscaled']):.3f} ")
+        print(f" -> RMSE Scaled/Unscaled: {np.mean(metrics['rmse_scaled']):.3f}; {np.mean(metrics['rmse_unscaled']):.3f} ")
         print(f" -> Accuracy: {np.mean(metrics['acc']):.3f}")
         print(f" -> ROC AUC Score: {np.mean(metrics['roc_auc']):.3f}")
         print(f" -> Time to fit: {np.mean(metrics['time']):3f} seconds")

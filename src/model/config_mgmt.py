@@ -9,7 +9,8 @@ REQUIRED_CONFIG_VARS = [
     "model_hyperparam_space",
     "objective_fn",
     "val_seasons",
-    "model_name"
+    "model_name",
+    "w_norm_data"
 ]
 
 TORCH_CONFIG_VARS = [
