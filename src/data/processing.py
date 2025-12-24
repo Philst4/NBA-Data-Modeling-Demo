@@ -217,3 +217,30 @@ def get_rolling_avgs(
         final_rolling_avgs[final_rolling_avgs.isna()] = 0
 
     return final_rolling_avgs
+
+def get_rolling_avg_diffs(df):
+    """
+    'STAT_diff_for_prev_0' is 'STAT_for_prev_0' - 'STAT_ag_opp_prev_0'
+    'STAT_diff_ag_prev_0' is 'STAT_ag_prev_0' - 'STAT_ag_opp_prev_0'
+    """
+    
+    for_cols = df.filter(regex=r"_for_prev_")
+    ag_opp_cols = df.filter(regex=r"_ag_opp_prev_")
+    diff_for = for_cols.values - ag_opp_cols.values
+    diff_for_cols = [
+        c.replace("_for_prev_", "_diff_for_prev_")
+        for c in for_cols.columns
+    ]
+    df[diff_for_cols] = diff_for
+
+    ag_cols = df.filter(regex=r"_ag_prev_")
+    for_opp_cols = df.filter(regex=r"_for_opp_prev_")
+
+    diff_ag = ag_cols.values - for_opp_cols.values
+    diff_ag_cols = [
+        c.replace("_ag_prev_", "_diff_ag_prev_")
+        for c in ag_cols.columns
+    ]
+    df[diff_ag_cols] = diff_ag
+
+    return df

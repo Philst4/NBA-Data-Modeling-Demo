@@ -15,7 +15,8 @@ from src.data.io import (
     save_to_db
 )
 from src.data.processing import (
-    get_rolling_avgs
+    get_rolling_avgs,
+    get_rolling_avg_diffs
 )
 
 def main(args):
@@ -40,6 +41,11 @@ def main(args):
         game_data=game_data,
         game_metadata=game_metadata,
         windows=[args.window]
+    )
+    
+    # Add rolling average differences
+    game_data_rolling_avgs = get_rolling_avg_diffs(
+        game_data_rolling_avgs
     )
     
     # Save to database
