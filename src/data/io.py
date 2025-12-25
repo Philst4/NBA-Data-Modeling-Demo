@@ -88,7 +88,7 @@ def get_modeling_data(
             game_data = query_db(db_path, f"SELECT * FROM {GAME_DATA_TABLE_NAME}")
             game_data_prev = query_db(db_path, f"SELECT * FROM {GAME_DATA_PREV_TABLE_NAME}")
         temporal_spatial = query_db(db_path, f"SELECT * FROM temporal_spatial")
-        temporal_spatial_rolling = query_db(db_path, f"SELECT * FROM temporal_spatial_rolling")
+        temporal_spatial_rolling = query_db(db_path, f"SELECT * FROM temporal_spatial_prev_{window}")
     else:
         
         # Find the game_metadata from the specified date
@@ -105,7 +105,7 @@ def get_modeling_data(
             game_data = query_db(db_path, f"SELECT * FROM {GAME_DATA_TABLE_NAME} WHERE UNIQUE_ID in {tuple(unique_ids)}")
             game_data_prev = query_db(db_path, f"SELECT * FROM {GAME_DATA_PREV_TABLE_NAME} WHERE UNIQUE_ID in {tuple(unique_ids)}")
         temporal_spatial = query_db(db_path, f"SELECT * FROM temporal_spatial WHERE UNIQUE_ID in {tuple(unique_ids)}")
-        temporal_spatial_rolling = query_db(db_path, f"SELECT * FROM temporal_spatial_rolling WHERE UNIQUE_ID in {tuple(unique_ids)}")
+        temporal_spatial_rolling = query_db(db_path, f"SELECT * FROM temporal_spatial_prev_{window} WHERE UNIQUE_ID in {tuple(unique_ids)}")
     
     
     # Merge to get modeling data

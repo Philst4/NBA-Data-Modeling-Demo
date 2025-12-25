@@ -127,7 +127,7 @@ def get_rolling_avgs(
 
             # Apply rolling and calculate mean, exclude current row
             rolling_avgs_opp = team_groups[cols_to_roll].apply(roll)
-            rolling_avgs_opp = rolling_avgs_opp.set_index(game_data.index).add_suffix('_mean_prev_' + window_str)
+            rolling_avgs_opp = rolling_avgs_opp.set_index(game_data.index).add_suffix('_prev_' + window_str)
 
             # Name opposing properly
             rolling_avgs_opp = rolling_avgs_opp.rename(columns=rename_for_rolled_opp)
