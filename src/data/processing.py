@@ -127,7 +127,7 @@ def get_rolling_avgs(
 
             # Apply rolling and calculate mean, exclude current row
             rolling_avgs_opp = team_groups[cols_to_roll].apply(roll)
-            rolling_avgs_opp = rolling_avgs_opp.set_index(game_data.index).add_suffix('_prev_' + window_str)
+            rolling_avgs_opp = rolling_avgs_opp.set_index(game_data.index).add_suffix('_mean_prev_' + window_str)
 
             # Name opposing properly
             rolling_avgs_opp = rolling_avgs_opp.rename(columns=rename_for_rolled_opp)
@@ -154,35 +154,247 @@ def get_rolling_avgs(
 
     return final_rolling_avgs
 
+#### NEW ####
+
+def get_rolling_stats(
+    game_data: pd.DataFrame,
+    game_metadata: pd.DataFrame,
+    game_data_cols=None,
+    windows: list = [1],
+    stats: tuple = ("mean", "std", "median", "IQR", "quantiles"),
+    quantiles: tuple = (0.10, 0.90),
+    need_opp: bool = True,
+    set_na_to_0: bool = True,
+) -> pd.DataFrame:
+    """
+    Compute rolling distributional statistics (leak-free) for game-level data.
+
+    Rolling stats are computed per team per season, excluding the current game
+    via shift(1).
+
+    Supported stats:
+        - mean        -> _mean_prev_k
+        - std         -> _std_prev_k
+        - median      -> _median_prev_k
+        - IQR         -> _IQR_prev_k
+        - quantiles   -> _Q{int(q*100)}_prev_k
+
+    Parameters
+    ----------
+    windows : list
+        Rolling window sizes. window <= 0 or > 82 -> treated as season window (prev_0)
+    """
+
+    # ------------------------
+    # Prep inputs
+    # ------------------------
+    if game_data_cols is not None:
+        game_data = game_data[["UNIQUE_ID"] + game_data_cols].copy()
+    else:
+        game_data = game_data.copy()
+
+    metadata_cols = [
+        "UNIQUE_ID",
+        "SEASON_ID",
+        "NEW_TEAM_ID_for",
+        "NEW_TEAM_ID_ag",
+        "GAME_DATE",
+    ]
+    game_metadata = game_metadata[metadata_cols].copy()
+
+    cols_to_roll = [c for c in game_data.columns if c != "UNIQUE_ID"]
+
+    # Merge metadata
+    df = pd.merge(game_metadata, game_data, on="UNIQUE_ID")
+    df["GAME_DATE"] = pd.to_datetime(df["GAME_DATE"])
+
+    all_outputs = []
+
+    # ------------------------
+    # Helper: compute rolling stats
+    # ------------------------
+    def compute_rolling(group, window):
+        rolled = group[cols_to_roll].shift(1).rolling(
+            window=window, min_periods=1
+        )
+
+        out = []
+
+        if "mean" in stats:
+            out.append(rolled.mean().add_suffix("_mean"))
+
+        if "std" in stats:
+            out.append(rolled.std().add_suffix("_std"))
+
+        if "median" in stats:
+            out.append(rolled.median().add_suffix("_median"))
+
+        if "IQR" in stats:
+            q75 = rolled.quantile(0.75)
+            q25 = rolled.quantile(0.25)
+            out.append((q75 - q25).add_suffix("_IQR"))
+
+        if "quantiles" in stats:
+            for q in quantiles:
+                q_df = rolled.quantile(q)
+                suffix = f"_Q{int(q * 100)}"
+                out.append(q_df.add_suffix(suffix))
+
+        return pd.concat(out, axis=1)
+
+    # ------------------------
+    # Main loop over windows
+    # ------------------------
+    for window in windows:
+        if window <= 0 or window > 82:
+            window = 100
+            window_str = "0"
+        else:
+            window_str = str(window)
+
+        # -------- FOR TEAM --------
+        df_for = df.sort_values(
+            ["SEASON_ID", "NEW_TEAM_ID_for", "GAME_DATE"]
+        )
+
+        rolled_for = (
+            df_for
+            .groupby(
+                ["SEASON_ID", "NEW_TEAM_ID_for"], 
+                group_keys=False
+            )
+            .apply(
+                lambda g: compute_rolling(g, window),
+                include_groups=False
+            )
+        )
+
+        rolled_for = rolled_for.set_index(df_for.index)
+        rolled_for.columns = [
+            f"{c}_prev_{window_str}" for c in rolled_for.columns
+        ]
+        rolled_for["UNIQUE_ID"] = df_for["UNIQUE_ID"].values
+
+        # -------- OPP TEAM --------
+        if need_opp:
+            df_opp = df.sort_values(
+                ["SEASON_ID", "NEW_TEAM_ID_ag", "GAME_DATE"]
+            )
+
+            rolled_opp = (
+                df_opp
+                .groupby(
+                    ["SEASON_ID", "NEW_TEAM_ID_ag"], 
+                    group_keys=False
+                )
+                .apply(
+                    lambda g: compute_rolling(g, window),
+                    include_groups=False
+                )
+            )
+
+            rolled_opp = rolled_opp.set_index(df_opp.index)
+            rolled_opp.columns = [
+                f"{c}_prev_{window_str}" for c in rolled_opp.columns
+            ]
+
+            # Rename from for → opp perspective
+            rolled_opp = rolled_opp.rename(columns=rename_for_rolled_opp)
+            rolled_opp["UNIQUE_ID"] = df_opp["UNIQUE_ID"].values
+
+            combined = pd.merge(
+                rolled_for, rolled_opp, on="UNIQUE_ID", how="inner"
+            )
+        else:
+            combined = rolled_for
+
+        all_outputs.append(combined)
+
+    # ------------------------
+    # Final assembly
+    # ------------------------
+    final = pd.concat(all_outputs, axis=1)
+    final = final.loc[:, ~final.columns.duplicated()]
+
+    if set_na_to_0:
+        final = final.fillna(0)
+
+    return final
+
+
+import re
+
+def add_rolling_diffs(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Adds rolling diff features in a non-fragmenting, vectorized way.
+    """
+
+    new_cols = {}
+
+    # -----------------------------
+    # FOR-team diffs
+    # -----------------------------
+    for col in df.columns:
+        m = re.match(r"(.+)_for_(.+)_prev_(.+)", col)
+        if not m:
+            continue
+
+        base, stat, window = m.groups()
+        opp_col = f"{base}_ag_opp_{stat}_prev_{window}"
+        diff_col = f"{base}_for_{stat}_diff_prev_{window}"
+
+        if opp_col in df.columns:
+            new_cols[diff_col] = df[col] - df[opp_col]
+
+    # -----------------------------
+    # AG-team diffs
+    # -----------------------------
+    for col in df.columns:
+        m = re.match(r"(.+)_ag_(.+)_prev_(.+)", col)
+        if not m:
+            continue
+
+        base, stat, window = m.groups()
+        opp_col = f"{base}_for_opp_{stat}_prev_{window}"
+        diff_col = f"{base}_ag_{stat}_diff_prev_{window}"
+
+        if opp_col in df.columns:
+            new_cols[diff_col] = df[col] - df[opp_col]
+
+    if not new_cols:
+        return df
+
+    # Single concat → no fragmentation
+    diff_df = pd.DataFrame(new_cols, index=df.index)
+    return pd.concat([df, diff_df], axis=1)
+
 def add_rolling_avg_diffs(df):
     """
-    'STAT_diff_for_prev_0' is 'STAT_for_prev_0' - 'STAT_ag_opp_prev_0'
-    'STAT_diff_ag_prev_0' is 'STAT_ag_prev_0' - 'STAT_ag_opp_prev_0'
+    'STAT1_for_STAT2_diff_prev_0' is 'STAT1_for_STAT2_prev_0' - 'STAT1_ag_opp_STAT2_prev_0'
+    'STAT1_ag_STAT2_diff_prev_0' is 'STAT1_ag_STAT2_prev_0' - 'STAT1_ag_opp_STAT2_prev_0'
+    E.g., 'PLUS_MINUS_for_mean_diff_prev_0'
     """
     
-    for_cols = df.filter(regex=r"_for_prev_")
-    ag_opp_cols = df.filter(regex=r"_ag_opp_prev_")
+    for_cols = df.filter(regex=r"_for_mean_prev_")
+    ag_opp_cols = df.filter(regex=r"_ag_mean_opp_prev_")
     diff_for = for_cols.values - ag_opp_cols.values
     diff_for_cols = [
-        c.replace("_for_prev_", "_diff_for_prev_")
+        c.replace("_for_mean_prev_", "_diff_for_mean_prev_")
         for c in for_cols.columns
     ]
     df[diff_for_cols] = diff_for
 
-    ag_cols = df.filter(regex=r"_ag_prev_")
-    for_opp_cols = df.filter(regex=r"_for_opp_prev_")
+    ag_cols = df.filter(regex=r"_ag_mean_prev_")
+    for_opp_cols = df.filter(regex=r"_for_mean_opp_prev_")
 
     diff_ag = ag_cols.values - for_opp_cols.values
     diff_ag_cols = [
-        c.replace("_ag_prev_", "_diff_ag_prev_")
+        c.replace("_ag_mean_prev_", "_diff_ag_mean_prev_")
         for c in ag_cols.columns
     ]
     df[diff_ag_cols] = diff_ag
 
     return df
-
-import pandas as pd
-import numpy as np
 
 def get_temporal_spatial_features(game_metadata: pd.DataFrame) -> pd.DataFrame:
     """

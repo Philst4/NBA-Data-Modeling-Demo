@@ -18,7 +18,9 @@ from src.data.io import (
 from src.data.processing import (
     get_temporal_spatial_features,
     get_rolling_avgs,
-    add_rolling_avg_diffs
+    add_rolling_avg_diffs,
+    get_rolling_stats,
+    add_rolling_diffs
 )
 
 def main(args):
@@ -60,9 +62,10 @@ def main(args):
         temporal_spatial_rolling.sort_values(by=['UNIQUE_ID']),
         CLEAN_DIR,
         DB_NAME,
-        "temporal_spatial_rolling"
+        f"temporal_spatial_prev_{args.window}"
     )
     
+    """
     # Get rolling averages
     game_data_rolling_avgs = get_rolling_avgs(
         game_data=game_data,
@@ -74,7 +77,18 @@ def main(args):
     game_data_rolling_avgs = add_rolling_avg_diffs(
         game_data_rolling_avgs
     )
-     
+    """
+    
+    game_data_rolling_stats = get_rolling_stats(
+        game_data,
+        game_metadata,
+        windows=[args.window]
+    )
+    
+    game_data_rolling_stats = add_rolling_diffs(
+        game_data_rolling_stats
+    )
+    
     # Save rolling to database
     suffix = "_"
     if args.normalized:
@@ -82,7 +96,7 @@ def main(args):
     suffix += "prev_" + str(args.window)
     
     save_to_db(
-        game_data_rolling_avgs.sort_values(by=['UNIQUE_ID']), 
+        game_data_rolling_stats.sort_values(by=['UNIQUE_ID']), 
         CLEAN_DIR,
         DB_NAME,
         MAIN_TABLE_NAME + suffix
