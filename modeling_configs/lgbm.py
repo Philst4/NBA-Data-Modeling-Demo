@@ -38,7 +38,7 @@ model_hyperparam_space = {
 objective_fn = root_mean_squared_error
 val_seasons = [2020, 2021, 2022, 2023, 2024]
 n_train_seasons_space = ("int", {"low" : 1, "high" : 10}) # Number of training seasons to use
-w_norm_data = False
+w_norm_data = True # Can make False
 
 # Names
 model_name = "lgbm"
