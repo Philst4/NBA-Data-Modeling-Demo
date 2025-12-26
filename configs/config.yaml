@@ -32,7 +32,7 @@ metadata:
       - TEAM_ABBREVIATION
       - TEAM_NAME
 
-main_table_name : 'game_data'
+main_table_name : 'team_stats_by_game'
   
 # Modeling config
 modeling_config_dir: 'modeling_configs'

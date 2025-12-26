@@ -239,6 +239,25 @@ def get_rolling_stats(
                 q_df = rolled.quantile(q)
                 suffix = f"_Q{int(q * 100)}"
                 out.append(q_df.add_suffix(suffix))
+                
+        # ------------------------
+        # GAME DENSITY 
+        # ------------------------
+        if "game_density" in stats:
+            dates = group["GAME_DATE"]
+
+            densities = []
+            for d in dates:
+                start = d - pd.Timedelta(days=window)
+                count = ((dates < d) & (dates >= start)).sum()
+                densities.append(count / window)
+
+            out.append(
+                pd.DataFrame(
+                    {"game_density": densities},
+                    index=group.index
+                )
+            )
 
         return pd.concat(out, axis=1)
 
@@ -396,64 +415,95 @@ def add_rolling_avg_diffs(df):
 
     return df
 
-def get_temporal_spatial_features(game_metadata: pd.DataFrame) -> pd.DataFrame:
+def get_temporal_spatial_features(
+    game_metadata: pd.DataFrame,
+    scale_0_1: bool = True
+) -> pd.DataFrame:
     """
-    Creates basic temporal and spatial features from game metadata.
-    
-    Returns per-row features:
+    Creates temporal and spatial features from game metadata.
+
+    Always returns:
+        - IS_HOME_for, IS_HOME_ag
         - B2B_for, B2B_ag
         - 3of4_for, 3of4_ag
         - travelled_for, travelled_ag
-        - IS_HOME_for, IS_HOME_ag
-        - UNIQUE_ID
+
+    Season progression features:
+        If scale_0_1=True:
+            *_scaled_in_szn
+            *_scaled_x_szn
+        If scale_0_1=False:
+            unscaled versions only
     """
 
     df = game_metadata.copy()
-
-    # Ensure datetime
     df["GAME_DATE"] = pd.to_datetime(df["GAME_DATE"])
+    df = df.sort_values(["SEASON_ID", "NEW_TEAM_ID_for", "GAME_DATE"])
 
-    # Sort for temporal ops
-    df = df.sort_values(["NEW_TEAM_ID_for", "GAME_DATE"])
-
-    # --- TEMPORAL FEATURES (FOR TEAM) ---------------------------------------
-
-    # Days since last game for the for-team
+    # ------------------------------------------------------------
+    # TEMPORAL (FOR)
+    # ------------------------------------------------------------
     df["days_since_last_for"] = (
-        df.groupby("NEW_TEAM_ID_for")["GAME_DATE"]
+        df.groupby(["SEASON_ID", "NEW_TEAM_ID_for"])["GAME_DATE"]
           .diff()
           .dt.days
     )
 
     df["B2B_for"] = (df["days_since_last_for"] == 1).astype(int)
 
-    # Count games in previous 3 days (inclusive window size = 4 days)
     def games_last_3_days(dates):
-        return [
-            (dates >= d - pd.Timedelta(days=3)).sum() - 1
-            for d in dates
-        ]
+        return [(dates >= d - pd.Timedelta(days=3)).sum() - 1 for d in dates]
 
     df["games_last_3_days_for"] = (
-        df.groupby("NEW_TEAM_ID_for")["GAME_DATE"]
+        df.groupby(["SEASON_ID", "NEW_TEAM_ID_for"])["GAME_DATE"]
           .transform(games_last_3_days)
     )
 
     df["3of4_for"] = (df["games_last_3_days_for"] >= 2).astype(int)
 
-    # --- TEMPORAL FEATURES (AG TEAM) ----------------------------------------
-    # Since each game appears twice, we can self-join on GAME_ID
+    # ------------------------------------------------------------
+    # SEASON PROGRESSION (FOR)
+    # ------------------------------------------------------------
+    df["games_into_season_for"] = (
+        df.groupby(["SEASON_ID", "NEW_TEAM_ID_for"]).cumcount() + 1
+    )
 
-    ag_features = df[[
-        "GAME_ID",
-        "NEW_TEAM_ID_for",
-        "B2B_for",
-        "3of4_for"
-    ]].rename(columns={
-        "NEW_TEAM_ID_for": "NEW_TEAM_ID_ag",
+    first_game = (
+        df.groupby(["SEASON_ID", "NEW_TEAM_ID_for"])["GAME_DATE"]
+          .transform("min")
+    )
+
+    df["days_into_season_for"] = (df["GAME_DATE"] - first_game).dt.days
+
+    season_games = (
+        df.groupby(["SEASON_ID", "NEW_TEAM_ID_for"])["GAME_DATE"]
+          .transform("count")
+    )
+
+    season_days = (
+        df.groupby(["SEASON_ID", "NEW_TEAM_ID_for"])["GAME_DATE"]
+          .transform("max") - first_game
+    ).dt.days
+
+    df["games_left_in_season_for"] = season_games - df["games_into_season_for"]
+    df["days_left_in_season_for"] = season_days - df["days_into_season_for"]
+
+    # ------------------------------------------------------------
+    # MIRROR TO AG
+    # ------------------------------------------------------------
+    ag_map = {
         "B2B_for": "B2B_ag",
-        "3of4_for": "3of4_ag"
-    })
+        "3of4_for": "3of4_ag",
+        "games_into_season_for": "games_into_season_ag",
+        "days_into_season_for": "days_into_season_ag",
+        "games_left_in_season_for": "games_left_in_season_ag",
+        "days_left_in_season_for": "days_left_in_season_ag",
+    }
+
+    ag_features = (
+        df[["GAME_ID", "NEW_TEAM_ID_for"] + list(ag_map.keys())]
+        .rename(columns={"NEW_TEAM_ID_for": "NEW_TEAM_ID_ag", **ag_map})
+    )
 
     df = df.merge(
         ag_features,
@@ -461,64 +511,91 @@ def get_temporal_spatial_features(game_metadata: pd.DataFrame) -> pd.DataFrame:
         how="left"
     )
 
-    # --- SPATIAL FEATURES (TRAVEL) ------------------------------------------
-
-    # Previous game info for for-team
+    # ------------------------------------------------------------
+    # TRAVEL
+    # ------------------------------------------------------------
     df["prev_IS_HOME_for"] = (
-        df.groupby("NEW_TEAM_ID_for")["IS_HOME"]
-          .shift(1)
+        df.groupby(["SEASON_ID", "NEW_TEAM_ID_for"])["IS_HOME"].shift(1)
     )
 
     df["prev_TEAM_ID_ag"] = (
-        df.groupby("NEW_TEAM_ID_for")["NEW_TEAM_ID_ag"]
-          .shift(1)
+        df.groupby(["SEASON_ID", "NEW_TEAM_ID_for"])["NEW_TEAM_ID_ag"].shift(1)
     )
 
     def travelled_for(row):
         if pd.isna(row["prev_IS_HOME_for"]):
             return 0
-        # Home -> Away or Away -> Home
         if row["IS_HOME"] != row["prev_IS_HOME_for"]:
             return 1
-        # Away -> Away, check opponent city
         if row["IS_HOME"] == 0:
             return int(row["NEW_TEAM_ID_ag"] != row["prev_TEAM_ID_ag"])
-        # Home -> Home
         return 0
 
     df["travelled_for"] = df.apply(travelled_for, axis=1)
 
-    # Mirror travelled_for for opponent
-    ag_travel = df[[
-        "GAME_ID",
-        "NEW_TEAM_ID_for",
-        "travelled_for"
-    ]].rename(columns={
-        "NEW_TEAM_ID_for": "NEW_TEAM_ID_ag",
-        "travelled_for": "travelled_ag"
-    })
-
     df = df.merge(
-        ag_travel,
+        df[["GAME_ID", "NEW_TEAM_ID_for", "travelled_for"]]
+          .rename(columns={
+              "NEW_TEAM_ID_for": "NEW_TEAM_ID_ag",
+              "travelled_for": "travelled_ag"
+          }),
         on=["GAME_ID", "NEW_TEAM_ID_ag"],
         how="left"
     )
 
-    # --- HOME FLAGS ----------------------------------------------------------
-
+    # ------------------------------------------------------------
+    # HOME FLAGS
+    # ------------------------------------------------------------
     df["IS_HOME_for"] = df["IS_HOME"].astype(int)
     df["IS_HOME_ag"] = (1 - df["IS_HOME"]).astype(int)
 
-    # --- RETURN --------------------------------------------------------------
+    # ------------------------------------------------------------
+    # SCALING (EXCLUSIVE)
+    # ------------------------------------------------------------
+    progression_cols = [
+        "games_into_season",
+        "games_left_in_season",
+        "days_into_season",
+        "days_left_in_season",
+    ]
 
-    return df[[
+    if scale_0_1:
+        max_games_x_szn = season_games.max()
+        max_days_x_szn = season_days.max()
+
+        for side in ["for", "ag"]:
+            for col in progression_cols:
+                base = f"{col}_{side}"
+
+                if "games" in col:
+                    df[f"{base}_scaled_in_szn"] = df[base] / season_games
+                    df[f"{base}_scaled_x_szn"] = df[base] / max_games_x_szn
+                else:
+                    df[f"{base}_scaled_in_szn"] = df[base] / season_days
+                    df[f"{base}_scaled_x_szn"] = df[base] / max_days_x_szn
+
+    # ------------------------------------------------------------
+    # FINAL COLUMN SELECTION (STRICT)
+    # ------------------------------------------------------------
+    base_feats = [
         "UNIQUE_ID",
-        "IS_HOME_for",
-        "IS_HOME_ag",
-        "B2B_for",
-        "B2B_ag",
-        "3of4_for",
-        "3of4_ag",
-        "travelled_for",
-        "travelled_ag"
-    ]]
+        "IS_HOME_for", "IS_HOME_ag",
+        "B2B_for", "B2B_ag",
+        "3of4_for", "3of4_ag",
+        "travelled_for", "travelled_ag",
+    ]
+
+    if scale_0_1:
+        prog_feats = [
+            c for c in df.columns
+            if c.endswith("_scaled_in_szn") or c.endswith("_scaled_x_szn")
+        ]
+    else:
+        prog_feats = [
+            f"{col}_{side}"
+            for col in progression_cols
+            for side in ["for", "ag"]
+        ]
+
+    return df[base_feats + prog_feats]
+

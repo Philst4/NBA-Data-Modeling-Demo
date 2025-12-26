@@ -83,12 +83,12 @@ def get_modeling_data(
         game_metadata = query_db(db_path, f"SELECT * FROM {GAME_METADATA_TABLE_NAME}")
         if w_norm_data:
             game_data = query_db(db_path, f"SELECT * FROM {GAME_DATA_NORM_TABLE_NAME}")
-            game_data_prev = query_db(db_path, f"SELECT * FROM {GAME_DATA_NORM_PREV_TABLE_NAME}")
+            game_data_prev = query_db(db_path, f"SELECT * FROM features_prev_0_norm")
+            temporal_spatial = query_db(db_path, f"SELECT * FROM features_ts_norm")
         else:
             game_data = query_db(db_path, f"SELECT * FROM {GAME_DATA_TABLE_NAME}")
-            game_data_prev = query_db(db_path, f"SELECT * FROM {GAME_DATA_PREV_TABLE_NAME}")
-        temporal_spatial = query_db(db_path, f"SELECT * FROM temporal_spatial")
-        temporal_spatial_rolling = query_db(db_path, f"SELECT * FROM temporal_spatial_prev_{window}")
+            game_data_prev = query_db(db_path, f"SELECT * FROM features_prev_0")
+            temporal_spatial = query_db(db_path, f"SELECT * FROM features_ts")
     else:
         
         # Find the game_metadata from the specified date
@@ -100,12 +100,12 @@ def get_modeling_data(
         # Query for data that has those UNIQUE_ID's
         if w_norm_data:
             game_data = query_db(db_path, f"SELECT * FROM {GAME_DATA_NORM_TABLE_NAME} WHERE UNIQUE_ID in {tuple(unique_ids)}")
-            game_data_prev = query_db(db_path, f"SELECT * FROM {GAME_DATA_NORM_PREV_TABLE_NAME} WHERE UNIQUE_ID in {tuple(unique_ids)}")
+            game_data_prev = query_db(db_path, f"SELECT * FROM features_prev_0_norm WHERE UNIQUE_ID in {tuple(unique_ids)}")
+            temporal_spatial = query_db(db_path, f"SELECT * FROM features_ts_norm WHERE UNIQUE_ID in {tuple(unique_ids)}")
         else:
             game_data = query_db(db_path, f"SELECT * FROM {GAME_DATA_TABLE_NAME} WHERE UNIQUE_ID in {tuple(unique_ids)}")
-            game_data_prev = query_db(db_path, f"SELECT * FROM {GAME_DATA_PREV_TABLE_NAME} WHERE UNIQUE_ID in {tuple(unique_ids)}")
-        temporal_spatial = query_db(db_path, f"SELECT * FROM temporal_spatial WHERE UNIQUE_ID in {tuple(unique_ids)}")
-        temporal_spatial_rolling = query_db(db_path, f"SELECT * FROM temporal_spatial_prev_{window} WHERE UNIQUE_ID in {tuple(unique_ids)}")
+            game_data_prev = query_db(db_path, f"SELECT * FROM features_prev_0 WHERE UNIQUE_ID in {tuple(unique_ids)}")
+            temporal_spatial = query_db(db_path, f"SELECT * FROM features_ts WHERE UNIQUE_ID in {tuple(unique_ids)}")
     
     
     # Merge to get modeling data
@@ -126,16 +126,9 @@ def get_modeling_data(
         on='UNIQUE_ID'
     )
     
-    modeling_data = pd.merge(
-        modeling_data,
-        temporal_spatial_rolling,
-        on='UNIQUE_ID'
-    )
-    
     # Get features + target
     features = [col for col in list(game_data_prev.columns) if col != 'UNIQUE_ID']
     features += [col for col in list(temporal_spatial.columns) if col != 'UNIQUE_ID']
-    features += [col for col in list(temporal_spatial_rolling.columns) if col != 'UNIQUE_ID']
     target = 'PLUS_MINUS_for'
     
     target_means_stds = None

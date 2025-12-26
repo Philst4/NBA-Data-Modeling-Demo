@@ -18,7 +18,6 @@ from src.data.io import (
 from src.data.processing import (
     get_temporal_spatial_features,
     get_rolling_avgs,
-    add_rolling_avg_diffs,
     get_rolling_stats,
     add_rolling_diffs
 )
@@ -40,66 +39,58 @@ def main(args):
     else:
         game_data = query_db(DB_PATH, f"SELECT * from {MAIN_TABLE_NAME}_norm")
     
+    # New table names
+    ts_features_table_name = f"features_ts"
+    rolling_features_table_name = f"features_prev_{args.window}"
+    if args.normalized:
+        ts_features_table_name += '_norm'
+        rolling_features_table_name += '_norm'
+    
     
     # Get temporal-spatial features, save
     temporal_spatial = get_temporal_spatial_features(
-        game_metadata
+        game_metadata,
+        scale_0_1=args.normalized
     )
     save_to_db(
         temporal_spatial.sort_values(by=['UNIQUE_ID']), 
         CLEAN_DIR,
         DB_NAME,
-        "temporal_spatial"
+        ts_features_table_name
     )
     
-    # Get rolling temporal-spatial features
-    temporal_spatial_rolling = get_rolling_avgs(
-        temporal_spatial,
-        game_metadata,
-        windows=[args.window]
-    )
-    save_to_db(
-        temporal_spatial_rolling.sort_values(by=['UNIQUE_ID']),
-        CLEAN_DIR,
-        DB_NAME,
-        f"temporal_spatial_prev_{args.window}"
-    )
-    
-    """
-    # Get rolling averages
-    game_data_rolling_avgs = get_rolling_avgs(
-        game_data=game_data,
-        game_metadata=game_metadata,
-        windows=[args.window]
-    )
-    
-    # Add rolling average differences
-    game_data_rolling_avgs = add_rolling_avg_diffs(
-        game_data_rolling_avgs
-    )
-    """
-    
+    # Get base rolling stats
     game_data_rolling_stats = get_rolling_stats(
         game_data,
         game_metadata,
         windows=[args.window]
     )
     
+    # Add diff rolling stats
     game_data_rolling_stats = add_rolling_diffs(
         game_data_rolling_stats
     )
     
-    # Save rolling to database
-    suffix = "_"
-    if args.normalized:
-        suffix += "norm_"
-    suffix += "prev_" + str(args.window)
+    # Add temporal spatial rolling
+    temporal_spatial_rolling = get_rolling_avgs(
+        temporal_spatial,
+        game_metadata,
+        windows=[args.window]
+    )
     
+    game_data_rolling_stats = pd.merge(
+        game_data_rolling_stats,
+        temporal_spatial_rolling,
+        on='UNIQUE_ID',
+        how='left'
+    )
+    
+    # Save rolling to database
     save_to_db(
         game_data_rolling_stats.sort_values(by=['UNIQUE_ID']), 
         CLEAN_DIR,
         DB_NAME,
-        MAIN_TABLE_NAME + suffix
+        rolling_features_table_name
     )
     
 if __name__ == "__main__":
