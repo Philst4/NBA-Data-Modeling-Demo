@@ -598,4 +598,3 @@ def get_temporal_spatial_features(
         ]
 
     return df[base_feats + prog_feats]
-

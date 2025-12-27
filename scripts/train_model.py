@@ -79,7 +79,8 @@ def main(args):
     modeling_data, features, target, _ = get_modeling_data(
         DB_PATH,
         config=config,
-        w_norm_data=modeling_config.w_norm_data
+        w_norm_data=modeling_config.w_norm_data,
+        windows=[5, 20, 0]
     )
     last_train_season = args.last_train_season
     n_train_seasons = all_hyperparams['n_train_seasons']

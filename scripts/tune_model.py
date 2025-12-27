@@ -54,7 +54,8 @@ def main(args):
     modeling_data, features, target, target_means_stds = get_modeling_data(
         db_path=DB_PATH,
         config=config,
-        w_norm_data=modeling_config.w_norm_data
+        w_norm_data=modeling_config.w_norm_data,
+        windows=[5, 20, 0]
     )
     
     # Get device

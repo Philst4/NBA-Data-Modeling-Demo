@@ -38,13 +38,30 @@ def read_from_parquet(read_path : str) -> pd.DataFrame:
     assert(os.path.exists(read_path)), f"{read_path} not found"
     return pd.read_parquet(read_path, engine="pyarrow")
 
+
+def reduce_precision(df):
+    df = df.copy()
+    
+    float_cols = df.select_dtypes(include=['float64']).columns
+    df[float_cols] = df[float_cols].astype('float32')
+        
+    int_cols = df.select_dtypes(include='int64').columns
+    df[int_cols] = df[int_cols].apply(pd.to_numeric, downcast="integer")
+    
+    return df
+
 def save_to_db(
     df : pd.DataFrame, 
     write_dir : str, 
     db_name : str, 
     table_name : str,
-    index=False
+    index=False,
+    w_reduced_precision=False
 ) -> None:
+    
+    if w_reduced_precision:
+        df = reduce_precision(df)
+    
     if not os.path.exists(write_dir):
         os.makedirs(write_dir, exist_ok=True)
     
@@ -65,30 +82,48 @@ def get_modeling_data(
     db_path,
     config,
     date=None,
-    window=0,
+    windows=[5, 20, 0],
     w_target_means_stds=True,
-    w_norm_data=True
+    w_norm_data=True,
+    w_reduced_precision=True
     ):
     """
     Returns the modeling data, feature names, target name
     """
     
+    print("Getting modeling data...")
+    
     GAME_METADATA_TABLE_NAME = config['metadata']['games']['table_name']
     GAME_DATA_TABLE_NAME =f"{config['main_table_name']}"
-    GAME_DATA_PREV_TABLE_NAME = GAME_DATA_TABLE_NAME + f'_prev_{window}'
     GAME_DATA_NORM_TABLE_NAME = GAME_DATA_TABLE_NAME + '_norm'
-    GAME_DATA_NORM_PREV_TABLE_NAME = f"{config['main_table_name']}_norm_prev_{window}"
+    target = 'PLUS_MINUS_for'
     
     if not date:
         game_metadata = query_db(db_path, f"SELECT * FROM {GAME_METADATA_TABLE_NAME}")
         if w_norm_data:
-            game_data = query_db(db_path, f"SELECT * FROM {GAME_DATA_NORM_TABLE_NAME}")
-            game_data_prev = query_db(db_path, f"SELECT * FROM features_prev_0_norm")
-            temporal_spatial = query_db(db_path, f"SELECT * FROM features_ts_norm")
+            features = query_db(db_path, f"SELECT * FROM features_ts_norm")
+            for window in windows:
+                features_prev_window = query_db(db_path, f"SELECT * FROM features_prev_{window}_norm")
+                features = pd.merge(
+                    features,
+                    features_prev_window,
+                    on='UNIQUE_ID',
+                    how='left'
+                )
+            targets = query_db(db_path, f"SELECT UNIQUE_ID, {target} FROM {GAME_DATA_NORM_TABLE_NAME}")
         else:
-            game_data = query_db(db_path, f"SELECT * FROM {GAME_DATA_TABLE_NAME}")
-            game_data_prev = query_db(db_path, f"SELECT * FROM features_prev_0")
-            temporal_spatial = query_db(db_path, f"SELECT * FROM features_ts")
+            features = query_db(db_path, f"SELECT * FROM features_ts")
+            for window in windows:
+                features_prev_window = query_db(db_path, f"SELECT * FROM features_prev_{window}")
+                features = pd.merge(
+                    features,
+                    features_prev_window,
+                    on='UNIQUE_ID',
+                    how='left'
+                )
+            targets = query_db(db_path, f"SELECT UNIQUE_ID, {target} FROM {GAME_DATA_TABLE_NAME}")
+            
+            
     else:
         
         # Find the game_metadata from the specified date
@@ -99,37 +134,41 @@ def get_modeling_data(
         
         # Query for data that has those UNIQUE_ID's
         if w_norm_data:
-            game_data = query_db(db_path, f"SELECT * FROM {GAME_DATA_NORM_TABLE_NAME} WHERE UNIQUE_ID in {tuple(unique_ids)}")
-            game_data_prev = query_db(db_path, f"SELECT * FROM features_prev_0_norm WHERE UNIQUE_ID in {tuple(unique_ids)}")
-            temporal_spatial = query_db(db_path, f"SELECT * FROM features_ts_norm WHERE UNIQUE_ID in {tuple(unique_ids)}")
+            features = query_db(db_path, f"SELECT * FROM features_ts_norm WHERE UNIQUE_ID in {tuple(unique_ids)}")
+            for window in windows:
+                features_prev_window = query_db(db_path, f"SELECT * FROM features_prev_{window}_norm WHERE UNIQUE_ID in {tuple(unique_ids)}")
+                features = pd.merge(
+                    features,
+                    features_prev_window,
+                    on='UNIQUE_ID',
+                    how='left'
+                )
+            targets = query_db(db_path, f"SELECT UNIQUE_ID, {target} FROM {GAME_DATA_NORM_TABLE_NAME} WHERE UNIQUE_ID in {tuple(unique_ids)}")
+            
         else:
-            game_data = query_db(db_path, f"SELECT * FROM {GAME_DATA_TABLE_NAME} WHERE UNIQUE_ID in {tuple(unique_ids)}")
-            game_data_prev = query_db(db_path, f"SELECT * FROM features_prev_0 WHERE UNIQUE_ID in {tuple(unique_ids)}")
-            temporal_spatial = query_db(db_path, f"SELECT * FROM features_ts WHERE UNIQUE_ID in {tuple(unique_ids)}")
+            features = query_db(db_path, f"SELECT * FROM features_ts WHERE UNIQUE_ID in {tuple(unique_ids)}")
+            for window in windows:
+                features_prev_window = query_db(db_path, f"SELECT * FROM features_prev_{window} WHERE UNIQUE_ID in {tuple(unique_ids)}")
+                features = pd.merge(
+                    features,
+                    features_prev_window,
+                    on='UNIQUE_ID',
+                    how='left'
+                )
+            targets = query_db(db_path, f"SELECT UNIQUE_ID, {target} FROM {GAME_DATA_TABLE_NAME} WHERE UNIQUE_ID in {tuple(unique_ids)}")
     
     
     # Merge to get modeling data
     modeling_data = pd.merge(
         game_metadata, 
-        game_data_prev, 
+        features, 
         on='UNIQUE_ID'
     )
     modeling_data = pd.merge(
         modeling_data, 
-        game_data[['UNIQUE_ID', 'PLUS_MINUS_for']], 
+        targets, 
         on='UNIQUE_ID'
     )
-    
-    modeling_data = pd.merge(
-        modeling_data,
-        temporal_spatial,
-        on='UNIQUE_ID'
-    )
-    
-    # Get features + target
-    features = [col for col in list(game_data_prev.columns) if col != 'UNIQUE_ID']
-    features += [col for col in list(temporal_spatial.columns) if col != 'UNIQUE_ID']
-    target = 'PLUS_MINUS_for'
     
     target_means_stds = None
     
@@ -140,5 +179,8 @@ def get_modeling_data(
             means_stds['SEASON_ID'].isin(seasons), 
             ['SEASON_ID', target + '_mean', target + '_std']
         ]
+        
+    if w_reduced_precision:
+        modeling_data = reduce_precision(modeling_data)
     
-    return modeling_data, features, target, target_means_stds
+    return modeling_data, list(features.columns), target, target_means_stds

@@ -41,10 +41,8 @@ def main(args):
     
     # New table names
     ts_features_table_name = f"features_ts"
-    rolling_features_table_name = f"features_prev_{args.window}"
     if args.normalized:
         ts_features_table_name += '_norm'
-        rolling_features_table_name += '_norm'
     
     
     # Get temporal-spatial features, save
@@ -56,47 +54,54 @@ def main(args):
         temporal_spatial.sort_values(by=['UNIQUE_ID']), 
         CLEAN_DIR,
         DB_NAME,
-        ts_features_table_name
+        ts_features_table_name,
+        w_reduced_precision=True
     )
     
-    # Get base rolling stats
-    game_data_rolling_stats = get_rolling_stats(
-        game_data,
-        game_metadata,
-        windows=[args.window]
-    )
-    
-    # Add diff rolling stats
-    game_data_rolling_stats = add_rolling_diffs(
-        game_data_rolling_stats
-    )
-    
-    # Add temporal spatial rolling
-    temporal_spatial_rolling = get_rolling_avgs(
-        temporal_spatial,
-        game_metadata,
-        windows=[args.window]
-    )
-    
-    game_data_rolling_stats = pd.merge(
-        game_data_rolling_stats,
-        temporal_spatial_rolling,
-        on='UNIQUE_ID',
-        how='left'
-    )
-    
-    # Save rolling to database
-    save_to_db(
-        game_data_rolling_stats.sort_values(by=['UNIQUE_ID']), 
-        CLEAN_DIR,
-        DB_NAME,
-        rolling_features_table_name
-    )
+    for window in args.windows:
+        rolling_features_table_name = f"features_prev_{window}"
+        if args.normalized:
+            rolling_features_table_name += '_norm'
+        
+        # Get base rolling stats
+        game_data_rolling_stats = get_rolling_stats(
+            game_data,
+            game_metadata,
+            windows=[window]
+        )
+        
+        # Add diff rolling stats
+        game_data_rolling_stats = add_rolling_diffs(
+            game_data_rolling_stats
+        )
+        
+        # Add temporal spatial rolling
+        temporal_spatial_rolling = get_rolling_avgs(
+            temporal_spatial,
+            game_metadata,
+            windows=[window]
+        )
+        
+        game_data_rolling_stats = pd.merge(
+            game_data_rolling_stats,
+            temporal_spatial_rolling,
+            on='UNIQUE_ID',
+            how='left'
+        )
+        
+        # Save rolling to database
+        save_to_db(
+            game_data_rolling_stats.sort_values(by=['UNIQUE_ID']), 
+            CLEAN_DIR,
+            DB_NAME,
+            rolling_features_table_name,
+            w_reduced_precision=True
+        )
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config_path", type=str, default=os.environ.get("CONFIG_PATH", "configs/config.yaml"), help="Config path")
-    parser.add_argument('--window', type=int, default=0, help="Window to make rolling averages over")
+    parser.add_argument('--windows', type=int, nargs='+', default=[5, 20, 0], help="Window to make rolling averages over")
     parser.add_argument(
         "--normalized",
         action="store_true",
