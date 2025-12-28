@@ -26,6 +26,10 @@ from src.data.io import (
     get_modeling_data
 )
 
+from src.data.processing import (
+    scale_data
+)
+
 from src.model.initialization import (
     extract_best_model_hyperparams_from_study
 )
@@ -76,7 +80,7 @@ def main(args):
     model_hyperparams = extract_best_model_hyperparams_from_study(study, modeling_config)
     
     # Load in data, get training data
-    modeling_data, features, target, _ = get_modeling_data(
+    modeling_data, feature_cols, target_col, means_stds = get_modeling_data(
         DB_PATH,
         config=config,
         w_norm_data=modeling_config.w_norm_data,
@@ -87,6 +91,13 @@ def main(args):
     train_condn1 = modeling_data['SEASON_ID'] - 20_000 <= last_train_season
     train_condn2 = last_train_season - (modeling_data['SEASON_ID'] - 20_000) <= n_train_seasons
     training_data = modeling_data.loc[train_condn1 & train_condn2, :]
+    val_condn = modeling_data['SEASON_ID'] == (20_000 + args.last_train_season + 1)
+    val_data = modeling_data.loc[val_condn, :]
+    
+    # Scale training + val_data according to last train_season
+    last_means_stds = means_stds.loc[means_stds['SEASON_ID'] == 20_000 + last_train_season]
+    training_data = scale_data(training_data, last_means_stds)
+    val_data = scale_data(val_data, last_means_stds)
     
     # Get device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -99,9 +110,10 @@ def main(args):
             modeling_config.model_class, 
             model_hyperparams,
             training_data,
-            features,
-            target,
-            device
+            feature_cols,
+            target_col,
+            device,
+            val_data=val_data
         )
         
     else:
@@ -120,8 +132,8 @@ def main(args):
             modeling_config.model_class,
             model_hyperparams,
             training_data,
-            features,
-            target,
+            feature_cols,
+            target_col,
             modeling_config.batch_size,
             modeling_config.optimizer_class,
             optimizer_hyperparams,

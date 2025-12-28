@@ -22,23 +22,6 @@ def read_from_csv(read_path : str) -> pd.DataFrame:
     assert(os.path.exists(read_path)), f"{read_path} not found"
     return pd.read_csv(read_path)
 
-def save_as_parquet(
-    df : pd.DataFrame,
-    write_dir : str,
-    parquet_name : str
-) -> None:
-    if not os.path.exists(write_dir):
-        os.makedirs(write_dir, exist_ok=True)
-    write_path = os.path.join(write_dir, parquet_name)
-    df.to_parquet(write_path, index=False, engine="pyarrow")
-    print(f" * Data written to: {write_path}")
-    
-def read_from_parquet(read_path : str) -> pd.DataFrame:
-    print(f" * Reading in '{read_path}' as pd.DataFrame ...")
-    assert(os.path.exists(read_path)), f"{read_path} not found"
-    return pd.read_parquet(read_path, engine="pyarrow")
-
-
 def reduce_precision(df):
     df = df.copy()
     
@@ -48,6 +31,32 @@ def reduce_precision(df):
     int_cols = df.select_dtypes(include='int64').columns
     df[int_cols] = df[int_cols].apply(pd.to_numeric, downcast="integer")
     
+    return df
+
+def save_as_parquet(
+    df : pd.DataFrame,
+    write_dir : str,
+    parquet_name : str,
+    w_reduced_precision=False
+) -> None:
+    if w_reduced_precision:
+        df = reduce_precision(df)
+    
+    if not os.path.exists(write_dir):
+        os.makedirs(write_dir, exist_ok=True)
+    write_path = os.path.join(write_dir, parquet_name)
+    df.to_parquet(write_path, index=False, engine="pyarrow")
+    print(f" * Data written to: {write_path}")
+    
+def read_from_parquet(
+    read_path : str,
+    w_reduced_precision=False
+) -> pd.DataFrame:
+    print(f" * Reading in '{read_path}' as pd.DataFrame ...")
+    assert(os.path.exists(read_path)), f"{read_path} not found"
+    df = pd.read_parquet(read_path, engine="pyarrow")
+    if w_reduced_precision:
+        df = reduce_precision(df)
     return df
 
 def save_to_db(
@@ -184,3 +193,189 @@ def get_modeling_data(
         modeling_data = reduce_precision(modeling_data)
     
     return modeling_data, list(features.columns), target, target_means_stds
+
+def get_modeling_data(
+    db_path,
+    config,
+    date=None,
+    windows=[5, 20, 0],
+    w_target_means_stds=True,
+    w_norm_data=True,
+    w_reduced_precision=True
+    ):
+    """
+    Returns the modeling data, feature names, target name
+    """
+    
+    print("Getting modeling data...")
+    
+    GAME_METADATA_TABLE_NAME = config['metadata']['games']['table_name']
+    GAME_DATA_TABLE_NAME =f"{config['main_table_name']}"
+    GAME_DATA_NORM_TABLE_NAME = GAME_DATA_TABLE_NAME + '_norm'
+    target = 'PLUS_MINUS_for'
+    
+    if not date:
+        game_metadata = query_db(db_path, f"SELECT * FROM {GAME_METADATA_TABLE_NAME}")
+        if w_norm_data:
+            features = query_db(db_path, f"SELECT * FROM features_ts_norm")
+            for window in windows:
+                features_prev_window = query_db(db_path, f"SELECT * FROM features_prev_{window}_norm")
+                features = pd.merge(
+                    features,
+                    features_prev_window,
+                    on='UNIQUE_ID',
+                    how='left'
+                )
+            targets = query_db(db_path, f"SELECT UNIQUE_ID, {target} FROM {GAME_DATA_NORM_TABLE_NAME}")
+        else:
+            features = query_db(db_path, f"SELECT * FROM features_ts")
+            for window in windows:
+                features_prev_window = query_db(db_path, f"SELECT * FROM features_prev_{window}")
+                features = pd.merge(
+                    features,
+                    features_prev_window,
+                    on='UNIQUE_ID',
+                    how='left'
+                )
+            targets = query_db(db_path, f"SELECT UNIQUE_ID, {target} FROM {GAME_DATA_TABLE_NAME}")
+            
+            
+    else:
+        
+        # Find the game_metadata from the specified date
+        game_metadata = query_db(db_path, f"SELECT * FROM {GAME_METADATA_TABLE_NAME} WHERE GAME_DATE = '{date}'")
+        
+        # Extract the proper UNIQUE_ID's from the date, use to query for relevant game_data + game_data_prev
+        unique_ids = list(game_metadata['UNIQUE_ID'])
+        
+        # Query for data that has those UNIQUE_ID's
+        if w_norm_data:
+            features = query_db(db_path, f"SELECT * FROM features_ts_norm WHERE UNIQUE_ID in {tuple(unique_ids)}")
+            for window in windows:
+                features_prev_window = query_db(db_path, f"SELECT * FROM features_prev_{window}_norm WHERE UNIQUE_ID in {tuple(unique_ids)}")
+                features = pd.merge(
+                    features,
+                    features_prev_window,
+                    on='UNIQUE_ID',
+                    how='left'
+                )
+            targets = query_db(db_path, f"SELECT UNIQUE_ID, {target} FROM {GAME_DATA_NORM_TABLE_NAME} WHERE UNIQUE_ID in {tuple(unique_ids)}")
+            
+        else:
+            features = query_db(db_path, f"SELECT * FROM features_ts WHERE UNIQUE_ID in {tuple(unique_ids)}")
+            for window in windows:
+                features_prev_window = query_db(db_path, f"SELECT * FROM features_prev_{window} WHERE UNIQUE_ID in {tuple(unique_ids)}")
+                features = pd.merge(
+                    features,
+                    features_prev_window,
+                    on='UNIQUE_ID',
+                    how='left'
+                )
+            targets = query_db(db_path, f"SELECT UNIQUE_ID, {target} FROM {GAME_DATA_TABLE_NAME} WHERE UNIQUE_ID in {tuple(unique_ids)}")
+    
+    
+    # Merge to get modeling data
+    modeling_data = pd.merge(
+        game_metadata, 
+        features, 
+        on='UNIQUE_ID'
+    )
+    modeling_data = pd.merge(
+        modeling_data, 
+        targets, 
+        on='UNIQUE_ID'
+    )
+    
+    target_means_stds = None
+    
+    if w_target_means_stds:
+        means_stds = query_db(db_path, f"SELECT * FROM {GAME_DATA_TABLE_NAME}_means_stds")
+        seasons = modeling_data['SEASON_ID'].unique()
+        target_means_stds = means_stds.loc[
+            means_stds['SEASON_ID'].isin(seasons), 
+            ['SEASON_ID', target + '_mean', target + '_std']
+        ]
+        
+    if w_reduced_precision:
+        modeling_data = reduce_precision(modeling_data)
+    
+    return modeling_data, list(features.columns), target, target_means_stds
+
+
+def get_modeling_data(
+    config,
+    windows=[5, 20, 0],
+    w_means_stds=True,
+    date=None,
+    w_reduced_precision=True
+):
+    print("Getting modeling data...")
+    CLEAN_DIR = config['clean_data_dir']
+    GAME_METADATA_TABLE_NAME = config['metadata']['games']['table_name']
+    GAME_DATA_TABLE_NAME =f"{config['main_table_name']}"
+    target = 'PLUS_MINUS_for'
+    
+    # Get data, filter for date after
+    game_metadata = read_from_parquet(
+        os.path.join(CLEAN_DIR, GAME_METADATA_TABLE_NAME + '.parquet')
+    )
+    if date:
+        modeling_data = game_metadata.loc[
+            game_metadata['GAME_DATE'] == date,
+            ['UNIQUE_ID', 'SEASON_ID']
+        ]
+    else:
+        modeling_data = game_metadata.loc[:, ['UNIQUE_ID', 'SEASON_ID']]
+    
+    # Get temp-spatial features
+    features = read_from_parquet(
+        os.path.join(CLEAN_DIR, 'features_ts.parquet'),
+        w_reduced_precision=w_reduced_precision
+    )
+    
+    # Get rolling features
+    for window in windows:
+        features_prev_window = read_from_parquet(
+            os.path.join(CLEAN_DIR, f'features_prev_{window}.parquet'),
+            w_reduced_precision=w_reduced_precision
+        )
+        features = pd.merge(
+            features,
+            features_prev_window,
+            on='UNIQUE_ID',
+            how='left'
+        )
+    
+    modeling_data = pd.merge(
+        modeling_data,
+        features,
+        on='UNIQUE_ID',
+        how='left'
+    )
+    
+    # Get targets
+    targets = read_from_parquet(
+        os.path.join(CLEAN_DIR, GAME_DATA_TABLE_NAME + '.parquet'),
+        w_reduced_precision=w_reduced_precision
+    )
+    modeling_data = pd.merge(
+        modeling_data,
+        targets[['UNIQUE_ID', target]],
+        on='UNIQUE_ID',
+        how='left'
+    )
+    
+    # Get means stds if specified
+    means_stds = None
+    
+    if w_means_stds:
+        means_stds = read_from_parquet(
+            os.path.join(CLEAN_DIR, "team_stats_by_game_means_stds_by_season.parquet"),
+            w_reduced_precision=w_reduced_precision
+        )
+    
+    return modeling_data, list(features.columns), target, means_stds
+    
+    
+        
+    

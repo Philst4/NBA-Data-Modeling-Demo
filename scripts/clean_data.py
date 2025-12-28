@@ -15,8 +15,7 @@ import sqlite3
 # Local imports
 from src.data.io import (
     read_from_parquet,
-    query_db,
-    save_to_db
+    save_as_parquet,
 )
 
 from src.data.cleaning import (
@@ -93,24 +92,21 @@ def clean_metadata(config):
     ) 
     drop_cols(game_metadata, ['TEAM_ID'])
     
-    # (4) Save (TODO update save_to_db for primary keys)
-    # Save game_metadata
-    save_to_db(
+    # (4) Save game_metadata, team_metadata as parquet
+    save_as_parquet(
         game_metadata,
         CLEAN_DIR,
-        DB_NAME,
-        GAME_METADATA_NAME
+        GAME_METADATA_NAME + '.parquet'
     )
     
-    # Save team_metadata
-    save_to_db(
+    save_as_parquet(
         team_metadata,
         CLEAN_DIR,
-        DB_NAME,
-        TEAM_METADATA_NAME
+        TEAM_METADATA_NAME + '.parquet'
     )
 
-def clean_data(args, config):
+
+def clean_data(config):
     print("--- RUNNING DATA CLEANING SCRIPT ---")
     
     # (0) Read in configuration
@@ -118,8 +114,6 @@ def clean_data(args, config):
     RAW_FILE_NAME = config['raw_filename']
     RAW_FILE_PATH = os.path.join(RAW_DIR, RAW_FILE_NAME)
     CLEAN_DIR = config['clean_data_dir']
-    DB_NAME = config['db_name']
-    DB_PATH = os.path.join(CLEAN_DIR, DB_NAME)
     
     # Loop will start here
     MAIN_TABLE_NAME = config['main_table_name']
@@ -146,10 +140,39 @@ def clean_data(args, config):
     # (1) Read in raw data, drop unneeded
     games = read_from_parquet(RAW_FILE_PATH)
     games['GAME_WON'] = games['WL'].map({'W' : 1, 'L' : 0})
+    
     drop_cols(games, COLS_TO_DROP_A)
     
-    # (2) Convert types (revisit)
-    pass
+    # (2) Get means, stds and save
+    means_stds_by_season = (
+        games
+        .sort_values(by='SEASON_ID')
+        .drop(columns=[
+            'UNIQUE_ID', 
+            'GAME_ID', 
+            'TEAM_ID', 
+            'IS_HOME', 
+            'GAME_WON'
+        ])
+        .groupby('SEASON_ID')
+        .agg(['mean', 'std'])
+        .reset_index()
+    )
+    
+    # Flatten MultiIndex columns
+    means_stds_by_season.columns = [
+        f"{col}_{stat}" if stat else col
+        for col, stat in means_stds_by_season.columns
+    ]
+    
+    means_stds_by_season['SEASON_ID'] = means_stds_by_season['SEASON_ID'].astype(int)
+
+    save_as_parquet(
+        means_stds_by_season,
+        CLEAN_DIR,
+        "team_stats_by_game_means_stds_by_season.parquet",
+        w_reduced_precision=True
+    )
 
     # (3) Add new features, drop unneeded after
     drop_cols(games, ['TEAM_ID'])
@@ -171,51 +194,23 @@ def clean_data(args, config):
     deal_w_NaNs(games)
     
     # (7) Save cleaned data
-    save_to_db(
-        games.sort_values(by='UNIQUE_ID'), 
+    save_as_parquet(
+        games.sort_values(by='UNIQUE_ID'),
         CLEAN_DIR,
-        DB_NAME,
-        MAIN_TABLE_NAME
+        MAIN_TABLE_NAME + '.parquet'
     )
     
-    # (8) Save a normalized game data table if specified
-    if args.w_norm_game_data:
-        
-        # Read in game metadata
-        try:
-            game_metadata = query_db(DB_PATH, f"SELECT * FROM {config['metadata']['games']['table_name']}")
-        except:
-            "Error fetching game_metadata, ensure that the script 'clean_metadata.py' is run before trying to save normalized clean data."
-        
-        # Compute normalized game data
-        games_norm, games_means_stds = get_normalized_by_season(games, game_metadata)
-        
-        # Save
-        save_to_db(
-            games_norm.sort_values(by='UNIQUE_ID'),
-            CLEAN_DIR,
-            DB_NAME,
-            MAIN_TABLE_NAME + "_norm"
-        )
-        
-        save_to_db(
-            games_means_stds,
-            CLEAN_DIR,
-            DB_NAME,
-            MAIN_TABLE_NAME + "_means_stds"
-        )
 
 def main(args):
     with open(args.config_path, 'r') as file:
         config = yaml.safe_load(file)
     clean_metadata(config)
-    clean_data(args, config)
+    clean_data(config)
 
 if __name__ == "__main__":
     # (-1) Deal with arguments
     parser = argparse.ArgumentParser()
     parser.add_argument("--config_path", type=str, default=os.environ.get("CONFIG_PATH", "configs/config.yaml"), help="Config path")
-    parser.add_argument("--w_norm_game_data", type=bool, default=True, help="Whether or not to normalize game data as well")
     args = parser.parse_args()
     
     main(args)

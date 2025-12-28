@@ -20,6 +20,10 @@ from src.model.predicting import (
     predict_torch
 )
 
+from src.data.processing import (
+    scale_data
+)
+
 def acc(y, y_preds):
     return ((y > 0) == (y_preds > 0)).astype(int).mean()
 
@@ -27,10 +31,9 @@ def backtest(
     model_class, 
     model_hyperparams, 
     modeling_data, 
-    features, 
-    target, 
-    target_means_stds,
-    target_is_normalized,
+    feature_cols, 
+    target_col, 
+    means_stds,
     val_seasons,
     n_train_seasons,
     objective_fn,
@@ -45,7 +48,7 @@ def backtest(
     Accumulates metrics of models trained/validated on specified train-val splits.
     """
 
-    # Dictionary to store metrics
+    # Dictionary to store train metrics
     metrics = {
         "val_season" : [],
         "target_means" : [],
@@ -80,6 +83,11 @@ def backtest(
         assert len(training_data) > 0, f"No training data when val_season={val_season}"
         assert len(val_data) > 0, f"No validation data when val_season={val_season}"
         
+        # Scale training + val_data according to last train_season
+        last_means_stds = means_stds.loc[means_stds['SEASON_ID'] == val_season_id - 1]
+        training_data = scale_data(training_data, last_means_stds)
+        val_data = scale_data(val_data, last_means_stds)
+        
         if not issubclass(model_class, nn.Module):
             # For sklearn-style model setups         
             # Get model instance fit on the training data
@@ -87,17 +95,18 @@ def backtest(
                 model_class,
                 model_hyperparams,
                 training_data,
-                features,
-                target,
-                device
+                feature_cols,
+                target_col,
+                device,
+                val_data=val_data
             )
             
             # Predict for validation set
-            y_val = val_data[target]
+            y_val = val_data[target_col]
             y_val_preds = predict_sklearn(
                 model, 
                 val_data, 
-                features
+                feature_cols
             )
             
             # Evaluate
@@ -110,8 +119,8 @@ def backtest(
                 model_class,
                 model_hyperparams,
                 training_data,
-                features,
-                target,
+                feature_cols,
+                target_col,
                 batch_size,
                 optimizer_class,
                 optimizer_hyperparams,
@@ -124,11 +133,11 @@ def backtest(
             y_val_preds = predict_torch(
                 model, 
                 val_data, 
-                features, 
+                feature_cols, 
                 batch_size,
                 device
             )
-            y_val = torch.tensor(val_data[[target]].values).to(device)
+            y_val = torch.tensor(val_data[[target_col]].values).to(device)
             score = objective_fn(y_val_preds, y_val).item()
             
             # Convert to numpy for next part
@@ -141,23 +150,15 @@ def backtest(
         metrics['score'].append(score)        
         metrics['val_season'].append(val_season)
         
-        mean = target_means_stds.loc[target_means_stds['SEASON_ID'] == val_season_id, target + '_mean'].values.item()
-        std = target_means_stds.loc[target_means_stds['SEASON_ID'] == val_season_id, target + '_std'].values.item()
+        mean = last_means_stds.loc[:, target_col.strip('_for') + '_mean'].values.item()
+        std = last_means_stds.loc[:, target_col.strip('_for') + '_std'].values.item()
         metrics['target_means'].append(mean)
         metrics['target_stds'].append(std)
         
-        if not target_is_normalized:
-            
-            unscaled_y_val = y_val
-            unscaled_y_val_preds = y_val_preds
-            scaled_y_val = (y_val - mean) / std
-            scaled_y_val_preds = (y_val_preds - mean) / std
-            
-        else:
-            unscaled_y_val = (std * y_val) + mean
-            unscaled_y_val_preds = (std * y_val_preds) + mean
-            scaled_y_val = y_val
-            scaled_y_val_preds = y_val_preds
+        unscaled_y_val = (std * y_val) + mean
+        unscaled_y_val_preds = (std * y_val_preds) + mean
+        scaled_y_val = y_val
+        scaled_y_val_preds = y_val_preds
             
         metrics['mae_unscaled'].append(
             mean_absolute_error(

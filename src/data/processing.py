@@ -1,5 +1,6 @@
 # COMMON DF PROCESSING #
 import pandas as pd
+import numpy as np
 
 def get_normalized_by_season(
     game_data: pd.DataFrame,
@@ -598,3 +599,43 @@ def get_temporal_spatial_features(
         ]
 
     return df[base_feats + prog_feats]
+
+def scale_data(df, means_stds):
+    """
+    Returns df with all features 'like' those seen in mean std scaled
+    
+    For example: 'PTS_mean', and 'PTS_std' exists in means_stds;
+    so all columns in df containing the same stem 'PTS' will
+    be scaled by subtracting 'PTS_mean', and dividing by 'PTS_std'
+    (e.g. 'PTS_for_prev_0', 'PTS_ag_opp_prev_5' will be scaled like this)
+    """
+    df = df.copy()
+    
+    # Expect means_stds to be a single-row df (e.g. per season)
+    means = means_stds.filter(like='_mean').iloc[0]
+    stds  = means_stds.filter(like='_std').iloc[0]
+
+    for mean_col in means.index:
+        stem = mean_col.replace('_mean', '')
+        std_col = f"{stem}_std"
+
+        if std_col not in stds.index:
+            continue
+
+        mean_val = means[mean_col]
+        std_val = stds[std_col]
+
+        # Avoid division by zero or NaNs
+        if not np.isfinite(std_val) or std_val == 0:
+            continue
+
+        # Scale all matching feature columns
+        feature_cols = [
+            c for c in df.columns
+            if c.startswith(stem) and not c.endswith(('_mean', '_std'))
+        ]
+
+        if feature_cols:
+            df[feature_cols] = (df[feature_cols] - mean_val) / std_val
+
+    return df

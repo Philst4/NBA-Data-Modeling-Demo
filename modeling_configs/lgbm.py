@@ -21,7 +21,7 @@ model_hyperparam_space = {
 
     # Tree complexity
     "num_leaves": ("int", {"low" : 31, "high" : 512}),
-    "max_depth": ("int", {"low" : -1, "high" : 16}),  # -1 = no limit
+    "max_depth": ("int", {"low" : 1, "high" : 16}),  # -1 = no limit
     "min_child_samples": ("int", {"low" : 5, "high" : 100}),
     "min_child_weight": ("float", {"low" : 1e-3, "high" : 10, "log": True}),
 

@@ -3,6 +3,7 @@ from time import time
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 from lightgbm import LGBMRegressor
+import lightgbm as lgb
 
 # Internal imports
 from src.model.dataloading import Gameset
@@ -13,7 +14,8 @@ def train_sklearn(
     training_data,
     features, 
     target,
-    device=None
+    device=None,
+    val_data=None
 ):
      
     assert len(training_data) > 0, f"No training data."
@@ -30,7 +32,24 @@ def train_sklearn(
     model = model_class(**model_hyperparams)
         
     # Fit the model on the training data
-    model.fit(X_tr, y_tr)
+    if model_class == LGBMRegressor and not val_data is None:
+        X_val = val_data[features]
+        y_val = val_data[target]
+        # Use early stopping for LGBM
+        model.fit(
+            X_tr,
+            y_tr,
+            eval_set=[(X_val, y_val)],
+            eval_metric="rmse",
+            callbacks=[
+                lgb.early_stopping(
+                    stopping_rounds=50,
+                    verbose=True
+                )
+            ]
+        )
+    else:
+        model.fit(X_tr, y_tr)
     
     # Return model
     return model

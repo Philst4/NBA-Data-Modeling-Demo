@@ -13,7 +13,9 @@ import pandas as pd
 # Internal imports
 from src.data.io import (
     query_db,
-    save_to_db
+    save_to_db,
+    read_from_parquet,
+    save_as_parquet,
 )
 from src.data.processing import (
     get_temporal_spatial_features,
@@ -27,41 +29,34 @@ def main(args):
     with open(args.config_path, 'r') as file:
         config = yaml.safe_load(file)
     CLEAN_DIR = config['clean_data_dir']    
-    DB_NAME = config['db_name']
-    DB_PATH = os.path.join(CLEAN_DIR, DB_NAME)
     METADATA_TABLE_NAME = config['metadata']['games']['table_name']
     MAIN_TABLE_NAME = config['main_table_name']
 
-    game_metadata = query_db(DB_PATH, f"SELECT * from {METADATA_TABLE_NAME}")
-    
-    if not args.normalized:
-        game_data = query_db(DB_PATH, f"SELECT * from {MAIN_TABLE_NAME}")
-    else:
-        game_data = query_db(DB_PATH, f"SELECT * from {MAIN_TABLE_NAME}_norm")
+    game_metadata = read_from_parquet(
+        os.path.join(CLEAN_DIR, METADATA_TABLE_NAME + '.parquet')
+    ) 
+    game_data = read_from_parquet(
+        os.path.join(CLEAN_DIR, MAIN_TABLE_NAME + '.parquet')
+    )
     
     # New table names
-    ts_features_table_name = f"features_ts"
-    if args.normalized:
-        ts_features_table_name += '_norm'
-    
+    ts_features_table_name = f"features_ts.parquet"
     
     # Get temporal-spatial features, save
     temporal_spatial = get_temporal_spatial_features(
         game_metadata,
-        scale_0_1=args.normalized
+        scale_0_1=args.ts_normalized
     )
-    save_to_db(
-        temporal_spatial.sort_values(by=['UNIQUE_ID']), 
+    
+    save_as_parquet(
+        temporal_spatial.sort_values(by=['UNIQUE_ID']),
         CLEAN_DIR,
-        DB_NAME,
         ts_features_table_name,
         w_reduced_precision=True
     )
     
     for window in args.windows:
-        rolling_features_table_name = f"features_prev_{window}"
-        if args.normalized:
-            rolling_features_table_name += '_norm'
+        rolling_features_table_name = f"features_prev_{window}.parquet"
         
         # Get base rolling stats
         game_data_rolling_stats = get_rolling_stats(
@@ -90,10 +85,9 @@ def main(args):
         )
         
         # Save rolling to database
-        save_to_db(
+        save_as_parquet(
             game_data_rolling_stats.sort_values(by=['UNIQUE_ID']), 
             CLEAN_DIR,
-            DB_NAME,
             rolling_features_table_name,
             w_reduced_precision=True
         )
@@ -103,14 +97,14 @@ if __name__ == "__main__":
     parser.add_argument("--config_path", type=str, default=os.environ.get("CONFIG_PATH", "configs/config.yaml"), help="Config path")
     parser.add_argument('--windows', type=int, nargs='+', default=[5, 20, 0], help="Window to make rolling averages over")
     parser.add_argument(
-        "--normalized",
+        "--ts_normalized",
         action="store_true",
         default=True,
         help="Use normalized data"
     )
     parser.add_argument(
-        "--not-normalized",
-        dest="normalized",
+        "--not-ts_normalized",
+        dest="ts_normalized",
         action="store_false",
         help="Disable normalization"
     )

@@ -51,26 +51,24 @@ def main(args):
     )
     
     # Get modeling data
-    modeling_data, features, target, target_means_stds = get_modeling_data(
-        db_path=DB_PATH,
+    modeling_data, feature_cols, target_col, means_stds = get_modeling_data(
         config=config,
-        w_norm_data=modeling_config.w_norm_data,
-        windows=[5, 20, 0]
+        windows=[5, 20, 0],
+        w_means_stds=True,
+        w_reduced_precision=True
     )
     
     # Get device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     # Make objective
-    target_is_normalized = modeling_config.w_norm_data
     objective = make_backtest_objective(
         modeling_config.model_class,
         modeling_config.model_hyperparam_space,
         modeling_data,
-        features,
-        target,
-        target_means_stds,
-        target_is_normalized,
+        feature_cols,
+        target_col,
+        means_stds,
         modeling_config.val_seasons, 
         modeling_config.n_train_seasons_space,
         modeling_config.objective_fn,
